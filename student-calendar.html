@@ -729,7 +729,6 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="firebase-config.js"></script>
 <script>
 firebase.initializeApp(window.FIREBASE_CONFIG);
@@ -1218,11 +1217,15 @@ function pickStripDay(ds){
 function signInGoogle(){
   const msg=document.getElementById('auth-msg');if(msg)msg.textContent='';
   const p=new firebase.auth.GoogleAuthProvider();
-  p.addScope('https://www.googleapis.com/auth/gmail.readonly');
-  const useRedirect=isMobile();
-  const auth=firebase.auth();
-  const doIt=useRedirect?auth.signInWithRedirect(p):auth.signInWithPopup(p);
-  doIt.catch(e=>{if(msg)msg.textContent=e.message||'Giris basarisiz';});
+  p.addScope(GMAIL_SCOPE);
+  firebase.auth().signInWithPopup(p)
+    .then(result=>{
+      storeGmailTokensFromCredential(result.credential);
+    })
+    .catch(err=>{
+      console.error(err);
+      if(msg)msg.textContent=(err&&err.message)||'Giris basarisiz';
+    });
 }
 function signOutUser(){firebase.auth().signOut().catch(e=>console.error(e));}
 function applyAuthState(user){
@@ -2694,100 +2697,41 @@ function oauthAccessTokenFromCredential(cred){
   return null;
 }
 
+function storeGmailTokensFromCredential(cred){
+  const t=oauthAccessTokenFromCredential(cred);
+  if(!t)return false;
+  const expAt=Date.now()+50*60*1000;
+  try{
+    if(window.gapi&&gapi.client)gapi.client.setToken({access_token:t});
+    sessionStorage.setItem('gmail_access_token',t);
+    sessionStorage.setItem('gmail_access_token_exp',String(expAt));
+    sessionStorage.setItem('gmail_token',t);
+  }catch(e){}
+  return true;
+}
+
 async function getGmailAccessToken(){
-  // Google Identity Services token (independent from Firebase Auth tokens)
   if(!firebase.auth().currentUser)throw new Error('Oturum gerekli');
-
-  const cid=(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.googleClientId)||'';
-  if(!cid||!String(cid).includes('.apps.googleusercontent.com')){
-    throw new Error('Gmail taramasi icin OAuth client ID eksik. `firebase-config.js` icinde `googleClientId` alanini (....apps.googleusercontent.com) doldurun.');
-  }
-  if(!(window.google&&google.accounts&&google.accounts.oauth2)){
-    throw new Error('Google OAuth kutuphanesi yuklenemedi. Internet baglantisini kontrol edin.');
-  }
-
   const now=Date.now();
   try{
-    const simpleTok=sessionStorage.getItem('gmail_token')||'';
-    if(simpleTok)return simpleTok;
-    const tok=sessionStorage.getItem('gmail_access_token')||'';
+    const tok=sessionStorage.getItem('gmail_access_token')||sessionStorage.getItem('gmail_token')||'';
     const exp=parseInt(sessionStorage.getItem('gmail_access_token_exp')||'0',10)||0;
     if(tok&&exp-now>60*1000)return tok;
   }catch(e){}
-
-  if(!S._gsiTokenClient)initGsiTokenClient();
-  if(!S._gsiTokenClient)throw new Error('OAuth token istemcisi baslatilamadi. Sayfayi yeniden yukleyin.');
-
-  const req=(promptVal)=>new Promise((resolve,reject)=>{
-    try{
-      S._gsiTokenClient.callback=(resp)=>{
-        if(!resp||resp.error){
-          console.error('Token error:', resp);
-          reject(new Error((resp&&resp.error)||'OAuth token alinamadi'));
-          return;
-        }
-        const t=resp.access_token;
-        const expAt=Date.now()+((resp.expires_in||3600)*1000);
-        try{
-          if(window.gapi&&gapi.client)gapi.client.setToken({access_token:t});
-        }catch(e){}
-        try{
-          sessionStorage.setItem('gmail_access_token',t);
-          sessionStorage.setItem('gmail_access_token_exp',String(expAt));
-          sessionStorage.setItem('gmail_token',t);
-        }catch(e){}
-        resolve(t);
-      };
-      S._gsiTokenClient.requestAccessToken({prompt: promptVal});
-    }catch(e){reject(e)}
-  });
-
-  return await req('consent');
+  return requestGmailAccessToken('consent');
 }
 
 async function requestGmailAccessToken(promptVal){
-  if(!S._gsiTokenClient)initGsiTokenClient();
-  if(!S._gsiTokenClient)throw new Error('OAuth token istemcisi baslatilamadi');
-  return new Promise((resolve,reject)=>{
-    try{
-      S._gsiTokenClient.callback=(response)=>{
-        if(!response||response.error){
-          console.error('Token error:', response);
-          reject(new Error((response&&response.error)||'OAuth token alinamadi'));
-          return;
-        }
-        const t=response.access_token||'';
-        if(!t){reject(new Error('OAuth token alinamadi'));return;}
-        try{
-          if(window.gapi&&gapi.client)gapi.client.setToken({access_token:t});
-          sessionStorage.setItem('gmail_token',t);
-          sessionStorage.setItem('gmail_access_token',t);
-          const expAt=Date.now()+((response.expires_in||3600)*1000);
-          sessionStorage.setItem('gmail_access_token_exp',String(expAt));
-        }catch(e){}
-        resolve(t);
-      };
-      S._gsiTokenClient.requestAccessToken({prompt: promptVal||''});
-    }catch(e){reject(e);}
-  });
-}
-
-function initGsiTokenClient(){
-  try{
-    const cid=(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.googleClientId)||'';
-    if(!cid||!String(cid).includes('.apps.googleusercontent.com'))return;
-    if(!(window.google&&google.accounts&&google.accounts.oauth2))return;
-    if(S._gsiTokenClient)return;
-    S._gsiTokenClient=google.accounts.oauth2.initTokenClient({
-      client_id: cid,
-      scope: GMAIL_SCOPE,
-      callback: (tokenResponse)=>{
-        if(tokenResponse&&tokenResponse.error)console.error('Token error:', tokenResponse);
-      }
-    });
-  }catch(e){
-    console.error('Token client init error:', e);
+  const user=firebase.auth().currentUser;
+  if(!user)throw new Error('Oturum gerekli');
+  const p=new firebase.auth.GoogleAuthProvider();
+  p.addScope(GMAIL_SCOPE);
+  if(promptVal==='consent')p.setCustomParameters({prompt:'consent'});
+  const result=await user.reauthenticateWithPopup(p);
+  if(!storeGmailTokensFromCredential(result.credential)){
+    throw new Error('Gmail erisim jetonu alinamadi. Gmail iznini onaylayin.');
   }
+  return sessionStorage.getItem('gmail_token')||'';
 }
 
 async function ensureGapiReady(){
@@ -2899,11 +2843,6 @@ async function fetchWithAuth(url){
 async function scanMail(){
   const btn=document.getElementById('btn-mscan');
   if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
-  if(!S._gsiTokenClient)initGsiTokenClient();
-  if(!S._gsiTokenClient){
-    alert('Sayfa yeniden yukle');
-    return;
-  }
   const u=firebase.auth().currentUser;
   const sab=(S.settings&&S.settings.sabanciEmail||'').trim();
   if(btn){btn.disabled=true;btn.textContent='Taranıyor...';}
@@ -3152,7 +3091,6 @@ initTheme();
 window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(onViewportResize,150)});
 firebase.auth().onAuthStateChanged(applyAuthState);
 window.addEventListener('load',()=>{
-  initGsiTokenClient();
   setTimeout(()=>{
     ensureGapiReady().then(()=>{
       try{
@@ -3162,8 +3100,7 @@ window.addEventListener('load',()=>{
     }).catch(()=>{});
   },0);
 });
-// Redirect result is still used for Firebase Auth login flows.
-// Gmail access token is handled via Google Identity Services token client.
+// Gmail: OAuth access token from signInWithPopup / reauthenticateWithPopup (gmail.readonly scope).
 </script>
 </body>
 </html>
