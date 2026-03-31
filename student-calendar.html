@@ -3214,6 +3214,8 @@ function notifDismiss(id){
   if(wasOpen&&rs)rs.classList.add('open');
 }
 
+let _authNullUiTimer=null;
+let _authBootstrapResolved=false;
 function startFirebaseAuthListener(){
   firebase.auth().onAuthStateChanged(user=>{
     if(S._suppressAuthListenerOnce&&user){
@@ -3222,15 +3224,49 @@ function startFirebaseAuthListener(){
       scheduleMailScanAfterRedirectIfNeeded();
       return;
     }
+    if(!user){
+      if(_authBootstrapResolved){
+        if(_authNullUiTimer){clearTimeout(_authNullUiTimer);_authNullUiTimer=null;}
+        applyAuthState(null);
+        return;
+      }
+      if(_authNullUiTimer)clearTimeout(_authNullUiTimer);
+      _authNullUiTimer=setTimeout(()=>{
+        _authNullUiTimer=null;
+        _authBootstrapResolved=true;
+        const cu=firebase.auth().currentUser;
+        if(cu){
+          console.log('[auth] ilk null sonrasi currentUser (LOCAL persistence)');
+          applyAuthState(cu);
+        }else{
+          applyAuthState(null);
+        }
+      },2600);
+      return;
+    }
+    if(_authNullUiTimer){
+      clearTimeout(_authNullUiTimer);
+      _authNullUiTimer=null;
+    }
+    _authBootstrapResolved=true;
     applyAuthState(user);
   });
+}
+function initFirebaseAuthFlow(){
+  const auth=firebase.auth();
+  const P=firebase.auth.Auth.Persistence;
+  const localPersist=(P&&P.LOCAL!==undefined)?P.LOCAL:'local';
+  return auth.setPersistence(localPersist)
+    .catch(err=>{console.error('setPersistence LOCAL',err);})
+    .then(()=>handleAuthRedirectResult())
+    .finally(()=>{
+      startFirebaseAuthListener();
+    });
 }
 /* ---- BASLANGIC ---- */
 initTheme();
 window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(onViewportResize,150)});
-handleAuthRedirectResult().finally(()=>{
-  startFirebaseAuthListener();
-});
+initFirebaseAuthFlow();
 window.addEventListener('load',()=>{
   setTimeout(()=>{
     ensureGapiReady().then(()=>{
