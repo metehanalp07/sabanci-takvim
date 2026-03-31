@@ -803,29 +803,74 @@ function scheduleMailScanAfterRedirectIfNeeded(){
   let should=false;
   try{should=sessionStorage.getItem(MAIL_SCAN_AFTER_LOAD_KEY)==='1';}catch(e){return}
   if(!should)return;
+
+  let finished=false;
+  let obs=null;
+  let pollTimer=null;
+
+  const dispose=()=>{
+    if(finished)return;
+    finished=true;
+    try{if(obs)obs.disconnect();}catch(e){}
+    try{if(pollTimer)clearInterval(pollTimer);}catch(e){}
+  };
+
   const run=()=>{
     try{
       if(sessionStorage.getItem(MAIL_SCAN_AFTER_LOAD_KEY)!=='1')return;
       sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);
       sessionStorage.removeItem(PENDING_MAIL_SCAN_KEY);
     }catch(e){}
-    console.log('[Mailleri Tara redirect] scheduleMailScanAfterRedirectIfNeeded -> scanMail()');
+    console.log('[Mailleri Tara redirect] scheduleMailScanAfterRedirectIfNeeded -> scanMail() (#app-main hazir)');
     setTimeout(()=>{try{scanMail();}catch(e){console.error(e);}},0);
   };
+
+  const isAppVisible=()=>{
+    const ap=document.getElementById('app-main');
+    return !!(ap&&ap.classList.contains('visible'));
+  };
+
+  const tryWhenVisible=()=>{
+    if(finished)return;
+    if(!isAppVisible())return;
+    dispose();
+    run();
+  };
+
   const app=document.getElementById('app-main');
-  if(app&&app.classList.contains('visible')){
+  if(isAppVisible()){
     run();
     return;
   }
-  let n=0;
-  const t=setInterval(()=>{
-    n++;
-    const ap=document.getElementById('app-main');
-    if(ap&&ap.classList.contains('visible')){
-      clearInterval(t);
-      run();
-    }else if(n>=120)clearInterval(t);
-  },50);
+
+  if(app&&typeof MutationObserver!=='undefined'){
+    try{
+      obs=new MutationObserver(()=>{tryWhenVisible();});
+      obs.observe(app,{attributes:true,attributeFilter:['class']});
+    }catch(e){obs=null;}
+  }
+
+  let ticks=0;
+  const MAX_TICKS=300;
+  pollTimer=setInterval(()=>{
+    ticks++;
+    tryWhenVisible();
+    if(finished)return;
+    if(ticks>=MAX_TICKS){
+      if(sessionStorage.getItem(MAIL_SCAN_AFTER_LOAD_KEY)==='1'){
+        const sec=Math.round(ticks*100)/1000;
+        console.warn('[Mailleri Tara redirect] #app-main '+sec+'s icinde visible olmadi; oturum varsa scan zorla deneniyor');
+        dispose();
+        try{
+          if(firebase.auth().currentUser)run();
+          else{
+            sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);
+            sessionStorage.removeItem(PENDING_MAIL_SCAN_KEY);
+          }
+        }catch(e){}
+      }else dispose();
+    }
+  },100);
 }
 function handleAuthRedirectResult(){
   return firebase.auth().getRedirectResult().then(result=>{
