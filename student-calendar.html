@@ -763,7 +763,6 @@ const S={
   notifications:[],
   settings:{sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0},
   dismissedKeys:new Set(),
-  runMailScanAfterAuth:false,
   editId:null, selCol:{},
   clk:{s:{h:9,m:0,mode:'h'},e:{h:10,m:30,mode:'h'}},
   actTypeId:'lesson',
@@ -779,6 +778,7 @@ function isGmailOAuthMobile(){
   return /Android|iPhone|iPad/i.test(navigator.userAgent||'');
 }
 const PENDING_MAIL_SCAN_KEY='pending_mail_scan';
+const MAIL_SCAN_AFTER_LOAD_KEY='mail_scan_after_load';
 function setPendingMailScan(){
   try{sessionStorage.setItem(PENDING_MAIL_SCAN_KEY,'1');}catch(e){}
 }
@@ -789,16 +789,69 @@ function consumePendingMailScan(){
     return v==='1';
   }catch(e){return false;}
 }
+function credentialFromGoogleRedirectResult(result){
+  if(!result)return null;
+  if(result.credential)return result.credential;
+  try{
+    const GCP=firebase.auth.GoogleAuthProvider;
+    if(GCP&&typeof GCP.credentialFromResult==='function')return GCP.credentialFromResult(result);
+  }catch(e){console.warn('[auth redirect] credentialFromResult',e);}
+  return null;
+}
+function scheduleMailScanAfterRedirectIfNeeded(){
+  let should=false;
+  try{should=sessionStorage.getItem(MAIL_SCAN_AFTER_LOAD_KEY)==='1';}catch(e){return}
+  if(!should)return;
+  const run=()=>{
+    try{
+      if(sessionStorage.getItem(MAIL_SCAN_AFTER_LOAD_KEY)!=='1')return;
+      sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);
+      sessionStorage.removeItem(PENDING_MAIL_SCAN_KEY);
+    }catch(e){}
+    console.log('[Mailleri Tara redirect] scheduleMailScanAfterRedirectIfNeeded -> scanMail()');
+    setTimeout(()=>{try{scanMail();}catch(e){console.error(e);}},0);
+  };
+  const app=document.getElementById('app-main');
+  if(app&&app.classList.contains('visible')){
+    run();
+    return;
+  }
+  let n=0;
+  const t=setInterval(()=>{
+    n++;
+    const ap=document.getElementById('app-main');
+    if(ap&&ap.classList.contains('visible')){
+      clearInterval(t);
+      run();
+    }else if(n>=120)clearInterval(t);
+  },50);
+}
 function handleAuthRedirectResult(){
   return firebase.auth().getRedirectResult().then(result=>{
-    if(result&&result.credential)storeGmailTokensFromCredential(result.credential);
-    try{
-      if(sessionStorage.getItem(PENDING_MAIL_SCAN_KEY)==='1')S.runMailScanAfterAuth=true;
-    }catch(e){}
+    const hadPending=sessionStorage.getItem(PENDING_MAIL_SCAN_KEY)==='1';
+    console.log('[Mailleri Tara redirect] getRedirectResult resolved',{
+      hadPending,
+      hasUser:!!(result&&result.user),
+      operationType:(result&&result.operationType)||null,
+      hasDirectCredential:!!(result&&result.credential)
+    });
+    const cred=credentialFromGoogleRedirectResult(result);
+    const rawAt=cred&&(cred.accessToken||cred.oauthAccessToken);
+    console.log('[Mailleri Tara redirect] resolved credential',!!cred,'accessToken chars',rawAt?String(rawAt).length:0);
+    let ok=false;
+    if(cred)ok=storeGmailTokensFromCredential(cred);
+    if(!ok&&rawAt)ok=storeGmailTokensFromCredential(String(rawAt));
+    if(hadPending&&ok){
+      try{sessionStorage.setItem(MAIL_SCAN_AFTER_LOAD_KEY,'1');}catch(e){}
+      console.log('[Mailleri Tara redirect] token stored, mail_scan_after_load set');
+    }else if(hadPending&&!ok){
+      console.warn('[Mailleri Tara redirect] pending scan ama OAuth access token saklanamadi');
+    }
+    scheduleMailScanAfterRedirectIfNeeded();
   }).catch(err=>{
-    console.error('getRedirectResult',err);
+    console.error('[Mailleri Tara redirect] getRedirectResult',err);
+    try{sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);}catch(e){}
     consumePendingMailScan();
-    S.runMailScanAfterAuth=false;
     const msg=document.getElementById('auth-msg');
     if(msg&&err&&err.message)msg.textContent=err.message;
   });
@@ -1269,7 +1322,7 @@ function applyAuthState(user){
   if(msg)msg.textContent='';
   if(!user){
     consumePendingMailScan();
-    S.runMailScanAfterAuth=false;
+    try{sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);}catch(e){}
     ov.classList.remove('hidden');app.classList.remove('visible');
     return;
   }
@@ -1282,11 +1335,7 @@ function applyAuthState(user){
     return loadDismissedKeys(user.uid).then(()=>{
       rLayers();rCal();rNotifications();
       maybeAutoScan();
-      if(S.runMailScanAfterAuth){
-        S.runMailScanAfterAuth=false;
-        consumePendingMailScan();
-        setTimeout(()=>{try{scanMail();}catch(e){console.error(e);}},0);
-      }
+      scheduleMailScanAfterRedirectIfNeeded();
     });
   }).catch(e=>{
     alert('Veri yuklenemedi: '+(e.message||e));
@@ -2739,8 +2788,10 @@ function oauthAccessTokenFromCredential(cred){
   return null;
 }
 
-function storeGmailTokensFromCredential(cred){
-  const t=oauthAccessTokenFromCredential(cred);
+function storeGmailTokensFromCredential(credOrToken){
+  let t=null;
+  if(typeof credOrToken==='string')t=(credOrToken||'').trim()||null;
+  else t=oauthAccessTokenFromCredential(credOrToken);
   if(!t)return false;
   const expAt=Date.now()+50*60*1000;
   try{
@@ -2770,8 +2821,10 @@ async function requestGmailAccessToken(promptVal){
   p.addScope(GMAIL_SCOPE);
   if(promptVal==='consent')p.setCustomParameters({prompt:'consent'});
   if(isGmailOAuthMobile()){
+    console.log('[Mailleri Tara] mobil: reauthenticateWithRedirect baslatiliyor (OAuth yenileme/izin)');
     setPendingMailScan();
     await user.reauthenticateWithRedirect(p);
+    console.log('[Mailleri Tara] reauthenticateWithRedirect Promise cözüldü (sayfa yönlendirmesi bekleniyor olabilir)');
     throw{_authRedirectPending:true};
   }
   const result=await user.reauthenticateWithPopup(p);
@@ -2887,6 +2940,11 @@ async function fetchWithAuth(url){
 }
 
 async function scanMail(){
+  console.log('[Mailleri Tara] scanMail basladi',{
+    mobilOAuth:isGmailOAuthMobile(),
+    hasUser:!!firebase.auth().currentUser,
+    pendingFlag:(function(){try{return sessionStorage.getItem(PENDING_MAIL_SCAN_KEY);}catch(e){return null}})()
+  });
   const btn=document.getElementById('btn-mscan');
   const btnM=document.getElementById('btn-mscan-mob');
   if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
