@@ -209,6 +209,13 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:10px}
+.auth-boot{position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;flex-direction:column}
+.auth-boot.hidden{display:none!important}
+.auth-boot-inner{display:flex;flex-direction:column;align-items:center;gap:16px}
+.auth-boot-logo{width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);color:#fff;font-size:20px;font-weight:800;font-family:var(--fn);display:flex;align-items:center;justify-content:center;letter-spacing:-.5px;box-shadow:var(--sh-dp)}
+.auth-boot-spin{width:28px;height:28px;border:3px solid var(--bd2);border-top-color:var(--ac);border-radius:50%;animation:auth-spin .75s linear infinite}
+@keyframes auth-spin{to{transform:rotate(360deg)}}
+.auth-boot-txt{font-size:14px;font-weight:500;color:var(--t2)}
 .login-scr{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
 .login-scr.hidden{display:none!important}
 .login-box{max-width:380px;text-align:center}
@@ -428,7 +435,15 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 </head>
 <body>
 
-<div id="login-overlay" class="login-scr">
+<div id="auth-loading" class="auth-boot" aria-busy="true" aria-live="polite">
+  <div class="auth-boot-inner">
+    <div class="auth-boot-logo" aria-hidden="true">SU</div>
+    <div class="auth-boot-spin" role="presentation"></div>
+    <p class="auth-boot-txt">Yükleniyor...</p>
+  </div>
+</div>
+
+<div id="login-overlay" class="login-scr hidden">
   <div class="login-box">
     <h1>Ders Takvimi</h1>
     <p class="login-sub">Google hesabınızla giriş yapın. Takvim verileriniz bulutta saklanır ve yalnızca sizin hesabınıza bağlıdır.</p>
@@ -1228,6 +1243,10 @@ function signInGoogle(){
     });
 }
 function signOutUser(){firebase.auth().signOut().catch(e=>console.error(e));}
+function hideAuthBootScreen(){
+  const boot=document.getElementById('auth-loading');
+  if(boot)boot.classList.add('hidden');
+}
 function applyAuthState(user){
   const ov=document.getElementById('login-overlay'),app=document.getElementById('app-main'),msg=document.getElementById('auth-msg');
   if(msg)msg.textContent='';
@@ -3086,10 +3105,28 @@ function notifDismiss(id){
   if(wasOpen&&rs)rs.classList.add('open');
 }
 
+let _authBootFirstEvent=true;
+function startFirebaseAuthListener(){
+  firebase.auth().onAuthStateChanged(user=>{
+    if(_authBootFirstEvent){
+      _authBootFirstEvent=false;
+      hideAuthBootScreen();
+    }
+    applyAuthState(user);
+  });
+}
+function initFirebaseAuthFlow(){
+  const auth=firebase.auth();
+  const P=firebase.auth.Auth.Persistence;
+  const localPersist=(P&&P.LOCAL!==undefined)?P.LOCAL:'local';
+  return auth.setPersistence(localPersist)
+    .catch(err=>{console.error('setPersistence LOCAL',err);})
+    .finally(()=>{startFirebaseAuthListener();});
+}
 /* ---- BASLANGIC ---- */
 initTheme();
 window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(onViewportResize,150)});
-firebase.auth().onAuthStateChanged(applyAuthState);
+initFirebaseAuthFlow();
 window.addEventListener('load',()=>{
   setTimeout(()=>{
     ensureGapiReady().then(()=>{
