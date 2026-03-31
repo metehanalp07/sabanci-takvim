@@ -763,7 +763,7 @@ const S={
   notifications:[],
   settings:{sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0},
   dismissedKeys:new Set(),
-  _suppressAuthListenerOnce:false,
+  runMailScanAfterAuth:false,
   editId:null, selCol:{},
   clk:{s:{h:9,m:0,mode:'h'},e:{h:10,m:30,mode:'h'}},
   actTypeId:'lesson',
@@ -779,7 +779,9 @@ function isGmailOAuthMobile(){
   return /Android|iPhone|iPad/i.test(navigator.userAgent||'');
 }
 const PENDING_MAIL_SCAN_KEY='pending_mail_scan';
-const MAIL_SCAN_AFTER_LOAD_KEY='mail_scan_after_load';
+function setPendingMailScan(){
+  try{sessionStorage.setItem(PENDING_MAIL_SCAN_KEY,'1');}catch(e){}
+}
 function consumePendingMailScan(){
   try{
     const v=sessionStorage.getItem(PENDING_MAIL_SCAN_KEY);
@@ -787,75 +789,16 @@ function consumePendingMailScan(){
     return v==='1';
   }catch(e){return false;}
 }
-function credentialFromGoogleRedirectResult(result){
-  if(!result)return null;
-  if(result.credential)return result.credential;
-  try{
-    const GCP=firebase.auth.GoogleAuthProvider;
-    if(GCP&&typeof GCP.credentialFromResult==='function')return GCP.credentialFromResult(result);
-  }catch(e){console.warn('[auth redirect] credentialFromResult',e);}
-  return null;
-}
-function scheduleMailScanAfterRedirectIfNeeded(){
-  let should=false;
-  try{should=sessionStorage.getItem(MAIL_SCAN_AFTER_LOAD_KEY)==='1';}catch(e){return}
-  if(!should)return;
-  const run=()=>{
-    try{
-      if(sessionStorage.getItem(MAIL_SCAN_AFTER_LOAD_KEY)!=='1')return;
-      sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);
-      sessionStorage.removeItem(PENDING_MAIL_SCAN_KEY);
-    }catch(e){}
-    console.log('[Mailleri Tara redirect] scheduleMailScanAfterRedirectIfNeeded -> scanMail()');
-    setTimeout(()=>{try{scanMail();}catch(e){console.error(e);}},0);
-  };
-  const app=document.getElementById('app-main');
-  if(app&&app.classList.contains('visible')){
-    run();
-    return;
-  }
-  let n=0;
-  const t=setInterval(()=>{
-    n++;
-    const ap=document.getElementById('app-main');
-    if(ap&&ap.classList.contains('visible')){
-      clearInterval(t);
-      run();
-    }else if(n>=120)clearInterval(t);
-  },50);
-}
 function handleAuthRedirectResult(){
   return firebase.auth().getRedirectResult().then(result=>{
-    const hadPending=sessionStorage.getItem(PENDING_MAIL_SCAN_KEY)==='1';
-    console.log('[Mailleri Tara redirect] getRedirectResult resolved',{
-      hadPending,
-      hasUser:!!(result&&result.user),
-      operationType:(result&&result.operationType)||null,
-      hasDirectCredential:!!(result&&result.credential)
-    });
-    const cred=credentialFromGoogleRedirectResult(result);
-    const rawAt=cred&&(cred.accessToken||cred.oauthAccessToken);
-    console.log('[Mailleri Tara redirect] resolved credential',!!cred,'accessToken chars',rawAt?String(rawAt).length:0);
-    let ok=false;
-    if(cred)ok=storeGmailTokensFromCredential(cred);
-    if(!ok&&rawAt)ok=storeGmailTokensFromCredential(String(rawAt));
-    if(hadPending&&ok){
-      try{sessionStorage.setItem(MAIL_SCAN_AFTER_LOAD_KEY,'1');}catch(e){}
-      console.log('[Mailleri Tara redirect] token stored, mail_scan_after_load set');
-    }else if(hadPending&&!ok){
-      console.warn('[Mailleri Tara redirect] pending scan ama OAuth access token saklanamadi');
-    }
-    const u=(result&&result.user)||firebase.auth().currentUser;
-    if(hadPending&&ok&&u){
-      console.log('[Mailleri Tara redirect] applyAuthState tetikleniyor — overlay kaldiriliyor, veri yuklenecek');
-      S._suppressAuthListenerOnce=true;
-      applyAuthState(u);
-    }
-    scheduleMailScanAfterRedirectIfNeeded();
+    if(result&&result.credential)storeGmailTokensFromCredential(result.credential);
+    try{
+      if(sessionStorage.getItem(PENDING_MAIL_SCAN_KEY)==='1')S.runMailScanAfterAuth=true;
+    }catch(e){}
   }).catch(err=>{
-    console.error('[Mailleri Tara redirect] getRedirectResult',err);
-    try{sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);}catch(e){}
+    console.error('getRedirectResult',err);
     consumePendingMailScan();
+    S.runMailScanAfterAuth=false;
     const msg=document.getElementById('auth-msg');
     if(msg&&err&&err.message)msg.textContent=err.message;
   });
@@ -1325,14 +1268,8 @@ function applyAuthState(user){
   const ov=document.getElementById('login-overlay'),app=document.getElementById('app-main'),msg=document.getElementById('auth-msg');
   if(msg)msg.textContent='';
   if(!user){
-    try{
-      if(sessionStorage.getItem(PENDING_MAIL_SCAN_KEY)==='1'){
-        console.log('[auth] applyAuthState(null) yoksayildi — OAuth redirect donusu bekleniyor');
-        return;
-      }
-    }catch(e){}
     consumePendingMailScan();
-    try{sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);}catch(e){}
+    S.runMailScanAfterAuth=false;
     ov.classList.remove('hidden');app.classList.remove('visible');
     return;
   }
@@ -1345,7 +1282,11 @@ function applyAuthState(user){
     return loadDismissedKeys(user.uid).then(()=>{
       rLayers();rCal();rNotifications();
       maybeAutoScan();
-      scheduleMailScanAfterRedirectIfNeeded();
+      if(S.runMailScanAfterAuth){
+        S.runMailScanAfterAuth=false;
+        consumePendingMailScan();
+        setTimeout(()=>{try{scanMail();}catch(e){console.error(e);}},0);
+      }
     });
   }).catch(e=>{
     alert('Veri yuklenemedi: '+(e.message||e));
@@ -2798,10 +2739,8 @@ function oauthAccessTokenFromCredential(cred){
   return null;
 }
 
-function storeGmailTokensFromCredential(credOrToken){
-  let t=null;
-  if(typeof credOrToken==='string')t=(credOrToken||'').trim()||null;
-  else t=oauthAccessTokenFromCredential(credOrToken);
+function storeGmailTokensFromCredential(cred){
+  const t=oauthAccessTokenFromCredential(cred);
   if(!t)return false;
   const expAt=Date.now()+50*60*1000;
   try{
@@ -2827,25 +2766,14 @@ async function getGmailAccessToken(){
 async function requestGmailAccessToken(promptVal){
   const user=firebase.auth().currentUser;
   if(!user)throw new Error('Oturum gerekli');
-  if(isGmailOAuthMobile()){
-    /* Gmail REST API Google OAuth access token ister; getIdToken Firebase JWT'dir, Gmail'e gonderilmez. */
-    /* Mobil: redirect/reauth yok; giris/redirect sonrasi sessionStorage'daki OAuth anahtari kullanilir. */
-    console.log('[Mailleri Tara] mobil: reauthenticate yok; getIdToken(true) + sessionStorage Gmail OAuth');
-    try{
-      await user.getIdToken(true);
-    }catch(e){
-      console.warn('[Mailleri Tara] getIdToken',e);
-    }
-    const tok=sessionStorage.getItem('gmail_access_token')||sessionStorage.getItem('gmail_token')||'';
-    const exp=parseInt(sessionStorage.getItem('gmail_access_token_exp')||'0',10)||0;
-    if(tok&&(exp-Date.now())>60*1000)return tok;
-    const err=new Error('Gmail taramasi icin gmail.readonly izni gerekli. Bu sayfayi uygulama icinde yerine telefonun tam tarayicisinda (Chrome veya Safari) acin veya Gmail izniyle tekrar giris yapin.');
-    err._gmailMobileUseBrowser=true;
-    throw err;
-  }
   const p=new firebase.auth.GoogleAuthProvider();
   p.addScope(GMAIL_SCOPE);
   if(promptVal==='consent')p.setCustomParameters({prompt:'consent'});
+  if(isGmailOAuthMobile()){
+    setPendingMailScan();
+    await user.reauthenticateWithRedirect(p);
+    throw{_authRedirectPending:true};
+  }
   const result=await user.reauthenticateWithPopup(p);
   if(!storeGmailTokensFromCredential(result.credential)){
     throw new Error('Gmail erisim jetonu alinamadi. Gmail iznini onaylayin.');
@@ -2952,18 +2880,13 @@ async function fetchWithAuth(url){
   let res=await fetch(url,{headers:{Authorization:'Bearer '+token}});
   if(res.status===401){
     const refreshed=await requestGmailAccessToken(isGmailOAuthMobile()?'consent':'');
-    try{if(refreshed)sessionStorage.setItem('gmail_token',refreshed);}catch(e){}
+    try{sessionStorage.setItem('gmail_token',refreshed);}catch(e){}
     res=await fetch(url,{headers:{Authorization:'Bearer '+refreshed}});
   }
   return res;
 }
 
 async function scanMail(){
-  console.log('[Mailleri Tara] scanMail basladi',{
-    mobilOAuth:isGmailOAuthMobile(),
-    hasUser:!!firebase.auth().currentUser,
-    pendingFlag:(function(){try{return sessionStorage.getItem(PENDING_MAIL_SCAN_KEY);}catch(e){return null}})()
-  });
   const btn=document.getElementById('btn-mscan');
   const btnM=document.getElementById('btn-mscan-mob');
   if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
@@ -3028,8 +2951,8 @@ async function scanMail(){
     console.log('Examlar:', window.debugMails.filter(m=>m.kind&&m.kind.kind==='exam'));
     console.log('Atlananlar:', window.debugMails.filter(m=>m.skipped));
   }catch(e){
-    if(e&&e._gmailMobileUseBrowser){
-      alert((e&&e.message)||'Gmail taramasi icin tam tarayicida acin.');
+    if(e&&e._authRedirectPending){
+      /* Mobil OAuth yonlendirmesi; token donusunden sonra tarama surer */
     }else{
       alert('Mail taramasi: '+((e&&e.message)||JSON.stringify(e)));
       console.error('Mail scan error:', e);
@@ -3214,59 +3137,11 @@ function notifDismiss(id){
   if(wasOpen&&rs)rs.classList.add('open');
 }
 
-let _authNullUiTimer=null;
-let _authBootstrapResolved=false;
-function startFirebaseAuthListener(){
-  firebase.auth().onAuthStateChanged(user=>{
-    if(S._suppressAuthListenerOnce&&user){
-      S._suppressAuthListenerOnce=false;
-      console.log('[auth] onAuthStateChanged atlandi (Gmail reauth icin applyAuthState zaten calisti)');
-      scheduleMailScanAfterRedirectIfNeeded();
-      return;
-    }
-    if(!user){
-      if(_authBootstrapResolved){
-        if(_authNullUiTimer){clearTimeout(_authNullUiTimer);_authNullUiTimer=null;}
-        applyAuthState(null);
-        return;
-      }
-      if(_authNullUiTimer)clearTimeout(_authNullUiTimer);
-      _authNullUiTimer=setTimeout(()=>{
-        _authNullUiTimer=null;
-        _authBootstrapResolved=true;
-        const cu=firebase.auth().currentUser;
-        if(cu){
-          console.log('[auth] ilk null sonrasi currentUser (LOCAL persistence)');
-          applyAuthState(cu);
-        }else{
-          applyAuthState(null);
-        }
-      },2600);
-      return;
-    }
-    if(_authNullUiTimer){
-      clearTimeout(_authNullUiTimer);
-      _authNullUiTimer=null;
-    }
-    _authBootstrapResolved=true;
-    applyAuthState(user);
-  });
-}
-function initFirebaseAuthFlow(){
-  const auth=firebase.auth();
-  const P=firebase.auth.Auth.Persistence;
-  const localPersist=(P&&P.LOCAL!==undefined)?P.LOCAL:'local';
-  return auth.setPersistence(localPersist)
-    .catch(err=>{console.error('setPersistence LOCAL',err);})
-    .then(()=>handleAuthRedirectResult())
-    .finally(()=>{
-      startFirebaseAuthListener();
-    });
-}
 /* ---- BASLANGIC ---- */
 initTheme();
 window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(onViewportResize,150)});
-initFirebaseAuthFlow();
+handleAuthRedirectResult();
+firebase.auth().onAuthStateChanged(applyAuthState);
 window.addEventListener('load',()=>{
   setTimeout(()=>{
     ensureGapiReady().then(()=>{
