@@ -763,6 +763,7 @@ const S={
   notifications:[],
   settings:{sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0},
   dismissedKeys:new Set(),
+  _suppressAuthListenerOnce:false,
   editId:null, selCol:{},
   clk:{s:{h:9,m:0,mode:'h'},e:{h:10,m:30,mode:'h'}},
   actTypeId:'lesson',
@@ -846,6 +847,12 @@ function handleAuthRedirectResult(){
       console.log('[Mailleri Tara redirect] token stored, mail_scan_after_load set');
     }else if(hadPending&&!ok){
       console.warn('[Mailleri Tara redirect] pending scan ama OAuth access token saklanamadi');
+    }
+    const u=(result&&result.user)||firebase.auth().currentUser;
+    if(hadPending&&ok&&u){
+      console.log('[Mailleri Tara redirect] applyAuthState tetikleniyor — overlay kaldiriliyor, veri yuklenecek');
+      S._suppressAuthListenerOnce=true;
+      applyAuthState(u);
     }
     scheduleMailScanAfterRedirectIfNeeded();
   }).catch(err=>{
@@ -1321,6 +1328,12 @@ function applyAuthState(user){
   const ov=document.getElementById('login-overlay'),app=document.getElementById('app-main'),msg=document.getElementById('auth-msg');
   if(msg)msg.textContent='';
   if(!user){
+    try{
+      if(sessionStorage.getItem(PENDING_MAIL_SCAN_KEY)==='1'){
+        console.log('[auth] applyAuthState(null) yoksayildi — OAuth redirect donusu bekleniyor');
+        return;
+      }
+    }catch(e){}
     consumePendingMailScan();
     try{sessionStorage.removeItem(MAIL_SCAN_AFTER_LOAD_KEY);}catch(e){}
     ov.classList.remove('hidden');app.classList.remove('visible');
@@ -3195,11 +3208,23 @@ function notifDismiss(id){
   if(wasOpen&&rs)rs.classList.add('open');
 }
 
+function startFirebaseAuthListener(){
+  firebase.auth().onAuthStateChanged(user=>{
+    if(S._suppressAuthListenerOnce&&user){
+      S._suppressAuthListenerOnce=false;
+      console.log('[auth] onAuthStateChanged atlandi (Gmail reauth icin applyAuthState zaten calisti)');
+      scheduleMailScanAfterRedirectIfNeeded();
+      return;
+    }
+    applyAuthState(user);
+  });
+}
 /* ---- BASLANGIC ---- */
 initTheme();
 window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(onViewportResize,150)});
-handleAuthRedirectResult();
-firebase.auth().onAuthStateChanged(applyAuthState);
+handleAuthRedirectResult().finally(()=>{
+  startFirebaseAuthListener();
+});
 window.addEventListener('load',()=>{
   setTimeout(()=>{
     ensureGapiReady().then(()=>{
