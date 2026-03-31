@@ -763,6 +763,7 @@ const S={
   notifications:[],
   settings:{sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0},
   dismissedKeys:new Set(),
+  runMailScanAfterAuth:false,
   editId:null, selCol:{},
   clk:{s:{h:9,m:0,mode:'h'},e:{h:10,m:30,mode:'h'}},
   actTypeId:'lesson',
@@ -773,6 +774,34 @@ function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/<
 function fmt(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
 function isMobile(){
   return (window.innerWidth<768)||(/Android|iPhone/i.test(navigator.userAgent||''));
+}
+function isGmailOAuthMobile(){
+  return /Android|iPhone|iPad/i.test(navigator.userAgent||'');
+}
+const PENDING_MAIL_SCAN_KEY='pending_mail_scan';
+function setPendingMailScan(){
+  try{sessionStorage.setItem(PENDING_MAIL_SCAN_KEY,'1');}catch(e){}
+}
+function consumePendingMailScan(){
+  try{
+    const v=sessionStorage.getItem(PENDING_MAIL_SCAN_KEY);
+    sessionStorage.removeItem(PENDING_MAIL_SCAN_KEY);
+    return v==='1';
+  }catch(e){return false;}
+}
+function handleAuthRedirectResult(){
+  return firebase.auth().getRedirectResult().then(result=>{
+    if(result&&result.credential)storeGmailTokensFromCredential(result.credential);
+    try{
+      if(sessionStorage.getItem(PENDING_MAIL_SCAN_KEY)==='1')S.runMailScanAfterAuth=true;
+    }catch(e){}
+  }).catch(err=>{
+    console.error('getRedirectResult',err);
+    consumePendingMailScan();
+    S.runMailScanAfterAuth=false;
+    const msg=document.getElementById('auth-msg');
+    if(msg&&err&&err.message)msg.textContent=err.message;
+  });
 }
 function syncViewUI(){
   const v=S.view;
@@ -963,11 +992,10 @@ function updateNotifWarn(){
   const btn=document.getElementById('btn-mscan');
   const warnM=document.getElementById('notif-warn-mob');
   const btnM=document.getElementById('btn-mscan-mob');
-  const has=!!((S.settings&&S.settings.sabanciEmail)||'').trim();
-  if(warn)warn.style.display=has?'none':'block';
-  if(btn)btn.disabled=!has;
-  if(warnM)warnM.style.display=has?'none':'block';
-  if(btnM)btnM.disabled=!has;
+  if(warn)warn.style.display='none';
+  if(warnM)warnM.style.display='none';
+  if(btn)btn.disabled=false;
+  if(btnM)btnM.disabled=false;
 }
 
 function notifCat(n){
@@ -1218,7 +1246,15 @@ function signInGoogle(){
   const msg=document.getElementById('auth-msg');if(msg)msg.textContent='';
   const p=new firebase.auth.GoogleAuthProvider();
   p.addScope(GMAIL_SCOPE);
-  firebase.auth().signInWithPopup(p)
+  const auth=firebase.auth();
+  if(isGmailOAuthMobile()){
+    auth.signInWithRedirect(p).catch(err=>{
+      console.error(err);
+      if(msg)msg.textContent=(err&&err.message)||'Giris basarisiz';
+    });
+    return;
+  }
+  auth.signInWithPopup(p)
     .then(result=>{
       storeGmailTokensFromCredential(result.credential);
     })
@@ -1232,6 +1268,8 @@ function applyAuthState(user){
   const ov=document.getElementById('login-overlay'),app=document.getElementById('app-main'),msg=document.getElementById('auth-msg');
   if(msg)msg.textContent='';
   if(!user){
+    consumePendingMailScan();
+    S.runMailScanAfterAuth=false;
     ov.classList.remove('hidden');app.classList.remove('visible');
     return;
   }
@@ -1244,6 +1282,11 @@ function applyAuthState(user){
     return loadDismissedKeys(user.uid).then(()=>{
       rLayers();rCal();rNotifications();
       maybeAutoScan();
+      if(S.runMailScanAfterAuth){
+        S.runMailScanAfterAuth=false;
+        consumePendingMailScan();
+        setTimeout(()=>{try{scanMail();}catch(e){console.error(e);}},0);
+      }
     });
   }).catch(e=>{
     alert('Veri yuklenemedi: '+(e.message||e));
@@ -1254,8 +1297,7 @@ function applyAuthState(user){
 function maybeAutoScan(){
   try{
     const p=(S.settings&&S.settings.scanPeriod)||'manual';
-    const sab=(S.settings&&S.settings.sabanciEmail||'').trim();
-    if(!sab||p==='manual')return;
+    if(p==='manual')return;
     const last=parseInt(S.settings.lastMailScanAt||0,10)||0;
     const now=Date.now();
     const dueMs=p==='daily'?24*60*60*1000:p==='weekly'?7*24*60*60*1000:0;
@@ -2727,6 +2769,11 @@ async function requestGmailAccessToken(promptVal){
   const p=new firebase.auth.GoogleAuthProvider();
   p.addScope(GMAIL_SCOPE);
   if(promptVal==='consent')p.setCustomParameters({prompt:'consent'});
+  if(isGmailOAuthMobile()){
+    setPendingMailScan();
+    await user.reauthenticateWithRedirect(p);
+    throw{_authRedirectPending:true};
+  }
   const result=await user.reauthenticateWithPopup(p);
   if(!storeGmailTokensFromCredential(result.credential)){
     throw new Error('Gmail erisim jetonu alinamadi. Gmail iznini onaylayin.');
@@ -2768,10 +2815,9 @@ async function gmailApiGet(token,path){
   return r.json();
 }
 
-async function fetchMailsWithToken(accessToken,sab){
+async function fetchMailsWithToken(accessToken){
   if(!accessToken)return[];
-  const qBase='newer_than:30d (from:sabanciuniv.edu OR from:sucourse.sabanciuniv.edu)';
-  const q=qBase;
+  const q='newer_than:30d (from:sabanciuniv.edu OR from:sucourse.sabanciuniv.edu)';
   let pageToken='',seenMsg=new Set((S.notifications||[]).map(n=>n.gmailMessageId).filter(Boolean));
   const rows=[];
   for(let guard=0;guard<15;guard++){
@@ -2833,7 +2879,7 @@ async function fetchWithAuth(url){
   }
   let res=await fetch(url,{headers:{Authorization:'Bearer '+token}});
   if(res.status===401){
-    const refreshed=await requestGmailAccessToken('');
+    const refreshed=await requestGmailAccessToken(isGmailOAuthMobile()?'consent':'');
     try{sessionStorage.setItem('gmail_token',refreshed);}catch(e){}
     res=await fetch(url,{headers:{Authorization:'Bearer '+refreshed}});
   }
@@ -2842,10 +2888,10 @@ async function fetchWithAuth(url){
 
 async function scanMail(){
   const btn=document.getElementById('btn-mscan');
+  const btnM=document.getElementById('btn-mscan-mob');
   if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
-  const u=firebase.auth().currentUser;
-  const sab=(S.settings&&S.settings.sabanciEmail||'').trim();
   if(btn){btn.disabled=true;btn.textContent='Taranıyor...';}
+  if(btnM){btnM.disabled=true;btnM.textContent='Taranıyor...';}
   window.debugMails=[];
   try{
     const accessToken=await getGmailAccessToken();
@@ -2853,7 +2899,7 @@ async function scanMail(){
     if(!(window.gapi&&window.gapi.client))await ensureGapiReady().catch(()=>{});
     console.log('Token:', (window.gapi&&gapi.client&&typeof gapi.client.getToken==='function')?gapi.client.getToken():null);
     console.log('Gmail API ready:', !!(window.gapi&&gapi.client));
-    const rawRows=await fetchMailsWithToken(accessToken,sab);
+    const rawRows=await fetchMailsWithToken(accessToken);
     rawRows.sort((a,b)=>b.gmailInternalDate-a.gmailInternalDate);
     const bestByKey=new Map();
     rawRows.forEach(row=>{
@@ -2905,10 +2951,15 @@ async function scanMail(){
     console.log('Examlar:', window.debugMails.filter(m=>m.kind&&m.kind.kind==='exam'));
     console.log('Atlananlar:', window.debugMails.filter(m=>m.skipped));
   }catch(e){
-    alert('Mail taramasi: '+((e&&e.message)||JSON.stringify(e)));
-    console.error('Mail scan error:', e);
+    if(e&&e._authRedirectPending){
+      /* Mobil OAuth yonlendirmesi; token donusunden sonra tarama surer */
+    }else{
+      alert('Mail taramasi: '+((e&&e.message)||JSON.stringify(e)));
+      console.error('Mail scan error:', e);
+    }
   }finally{
     if(btn){btn.disabled=false;btn.textContent='Mailleri Tara';}
+    if(btnM){btnM.disabled=false;btnM.textContent='Mailleri Tara';}
   }
 }
 
@@ -3089,6 +3140,7 @@ function notifDismiss(id){
 /* ---- BASLANGIC ---- */
 initTheme();
 window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(onViewportResize,150)});
+handleAuthRedirectResult();
 firebase.auth().onAuthStateChanged(applyAuthState);
 window.addEventListener('load',()=>{
   setTimeout(()=>{
@@ -3100,7 +3152,7 @@ window.addEventListener('load',()=>{
     }).catch(()=>{});
   },0);
 });
-// Gmail: OAuth access token from signInWithPopup / reauthenticateWithPopup (gmail.readonly scope).
+// Gmail: access token from signInWithPopup / reauthenticateWithPopup (masaustu) veya redirect + getRedirectResult (mobil).
 </script>
 </body>
 </html>
