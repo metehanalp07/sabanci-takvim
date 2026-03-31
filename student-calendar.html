@@ -780,9 +780,6 @@ function isGmailOAuthMobile(){
 }
 const PENDING_MAIL_SCAN_KEY='pending_mail_scan';
 const MAIL_SCAN_AFTER_LOAD_KEY='mail_scan_after_load';
-function setPendingMailScan(){
-  try{sessionStorage.setItem(PENDING_MAIL_SCAN_KEY,'1');}catch(e){}
-}
 function consumePendingMailScan(){
   try{
     const v=sessionStorage.getItem(PENDING_MAIL_SCAN_KEY);
@@ -2830,16 +2827,25 @@ async function getGmailAccessToken(){
 async function requestGmailAccessToken(promptVal){
   const user=firebase.auth().currentUser;
   if(!user)throw new Error('Oturum gerekli');
+  if(isGmailOAuthMobile()){
+    /* Gmail REST API Google OAuth access token ister; getIdToken Firebase JWT'dir, Gmail'e gonderilmez. */
+    /* Mobil: redirect/reauth yok; giris/redirect sonrasi sessionStorage'daki OAuth anahtari kullanilir. */
+    console.log('[Mailleri Tara] mobil: reauthenticate yok; getIdToken(true) + sessionStorage Gmail OAuth');
+    try{
+      await user.getIdToken(true);
+    }catch(e){
+      console.warn('[Mailleri Tara] getIdToken',e);
+    }
+    const tok=sessionStorage.getItem('gmail_access_token')||sessionStorage.getItem('gmail_token')||'';
+    const exp=parseInt(sessionStorage.getItem('gmail_access_token_exp')||'0',10)||0;
+    if(tok&&(exp-Date.now())>60*1000)return tok;
+    const err=new Error('Gmail taramasi icin gmail.readonly izni gerekli. Bu sayfayi uygulama icinde yerine telefonun tam tarayicisinda (Chrome veya Safari) acin veya Gmail izniyle tekrar giris yapin.');
+    err._gmailMobileUseBrowser=true;
+    throw err;
+  }
   const p=new firebase.auth.GoogleAuthProvider();
   p.addScope(GMAIL_SCOPE);
   if(promptVal==='consent')p.setCustomParameters({prompt:'consent'});
-  if(isGmailOAuthMobile()){
-    console.log('[Mailleri Tara] mobil: reauthenticateWithRedirect baslatiliyor (OAuth yenileme/izin)');
-    setPendingMailScan();
-    await user.reauthenticateWithRedirect(p);
-    console.log('[Mailleri Tara] reauthenticateWithRedirect Promise cözüldü (sayfa yönlendirmesi bekleniyor olabilir)');
-    throw{_authRedirectPending:true};
-  }
   const result=await user.reauthenticateWithPopup(p);
   if(!storeGmailTokensFromCredential(result.credential)){
     throw new Error('Gmail erisim jetonu alinamadi. Gmail iznini onaylayin.');
@@ -2946,7 +2952,7 @@ async function fetchWithAuth(url){
   let res=await fetch(url,{headers:{Authorization:'Bearer '+token}});
   if(res.status===401){
     const refreshed=await requestGmailAccessToken(isGmailOAuthMobile()?'consent':'');
-    try{sessionStorage.setItem('gmail_token',refreshed);}catch(e){}
+    try{if(refreshed)sessionStorage.setItem('gmail_token',refreshed);}catch(e){}
     res=await fetch(url,{headers:{Authorization:'Bearer '+refreshed}});
   }
   return res;
@@ -3022,8 +3028,8 @@ async function scanMail(){
     console.log('Examlar:', window.debugMails.filter(m=>m.kind&&m.kind.kind==='exam'));
     console.log('Atlananlar:', window.debugMails.filter(m=>m.skipped));
   }catch(e){
-    if(e&&e._authRedirectPending){
-      /* Mobil OAuth yonlendirmesi; token donusunden sonra tarama surer */
+    if(e&&e._gmailMobileUseBrowser){
+      alert((e&&e.message)||'Gmail taramasi icin tam tarayicida acin.');
     }else{
       alert('Mail taramasi: '+((e&&e.message)||JSON.stringify(e)));
       console.error('Mail scan error:', e);
