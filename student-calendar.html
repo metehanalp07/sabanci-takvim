@@ -137,11 +137,16 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .mcev{font-size:10px;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 .mcmo{font-size:10px;color:var(--t3);padding:1px 5px;font-family:var(--mo)}
 .ov{display:none;position:fixed;inset:0;background:var(--ov-bg);z-index:100;align-items:center;justify-content:center}
+.ov.ov-top{z-index:450}
 .ov.open{display:flex}
 @media (max-width:767px){
   .ov.open{align-items:stretch;justify-content:stretch;padding:0}
 }
 .mb{background:var(--sf);border-radius:var(--rl);border:1px solid var(--bd);width:430px;max-width:96vw;max-height:94vh;overflow-y:auto;box-shadow:var(--sh-mb)}
+.mb.sdp-mb{width:min(520px,96vw)}
+.sdp-ta{width:100%;min-height:200px;max-height:45vh;padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r);background:var(--s2);color:var(--tx);font-size:11px;font-family:var(--mo);line-height:1.45;resize:vertical;outline:none;box-sizing:border-box}
+.sdp-ta:focus{border-color:var(--ac);background:var(--sf)}
+.sdp-hint{font-size:10px;color:var(--t3);line-height:1.4;margin-top:6px}
 .mhd{padding:16px 16px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--sf);z-index:2}
 .mhd h2{font-size:14px;font-weight:600;order:1;flex:1;text-align:left}
 .mhd .mx{order:2;margin-left:auto;flex-shrink:0}
@@ -467,6 +472,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
         <button type="button" class="thm-s" data-theme-pref="system" onclick="setThemePref('system')">Sistem</button>
       </div>
     </div>
+    <button type="button" class="adb" style="margin-top:12px;width:100%" onclick="openSchedulePasteModal()"><span class="pi">&#128203;</span> Ders Programı Ekle</button>
   </div>
   <div id="ls">
     <div class="sl">Katmanlar</div><div id="lw"></div>
@@ -709,6 +715,28 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
       <button class="bdd" id="ev-del" style="display:none;" onclick="delEv()">Sil</button>
       <button class="bs" onclick="closeM()">Iptal</button>
       <button class="bp" onclick="saveEv()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUCOURSE DERS PROGRAMI YAPISTIR -->
+<div class="ov ov-top" id="sdp-ov" onclick="if(event.target===this)closeSchedulePasteModal()" aria-hidden="true">
+  <div class="mb sdp-mb" onclick="event.stopPropagation()">
+    <div class="mhd">
+      <button type="button" class="mx" onclick="closeSchedulePasteModal()" aria-label="Kapat"><span class="m-kic" aria-hidden="true">&#215;</span><span class="m-ktxt">Kapat</span></button>
+      <h2>SUCourse — Ders Programı</h2>
+      <div class="mhd-sp" aria-hidden="true"></div>
+    </div>
+    <div class="mbd">
+      <div class="fg">
+        <label for="sdp-ta">Metni yapıştırın</label>
+        <textarea id="sdp-ta" class="sdp-ta" spellcheck="false" placeholder="Programming Fundamentals - CS 201 - A&#10;Class  12:40 pm - 2:30 pm  M  ..."></textarea>
+        <p class="sdp-hint">Her ders için üst satır: <strong>Ders adı - XX 123 - Bölüm</strong>. Alt satırlar: <strong>Class</strong> / <strong>Recitation</strong> / <strong>Discussion</strong>, saat aralığı, <strong>M T W R F</strong> günü, sınıf, <strong>Feb 16, 2026 - May 22, 2026</strong> aralığı. Haftalık tekrar; tarih aralığı nota yazılır.</p>
+      </div>
+    </div>
+    <div class="mft">
+      <button type="button" class="bs" onclick="closeSchedulePasteModal()">İptal</button>
+      <button type="button" class="bp" onclick="confirmSchedulePaste()">Ekle</button>
     </div>
   </div>
 </div>
@@ -1569,6 +1597,126 @@ function openEdit(id){
   document.getElementById('eov').classList.add('open');
 }
 function closeM(){document.getElementById('eov').classList.remove('open')}
+function openSchedulePasteModal(){
+  if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
+  try{closeSb();}catch(e){}
+  const ov=document.getElementById('sdp-ov');
+  if(ov){ov.classList.add('open');ov.setAttribute('aria-hidden','false');}
+  setTimeout(()=>{const t=document.getElementById('sdp-ta');if(t)t.focus();},80);
+}
+function closeSchedulePasteModal(){
+  const ov=document.getElementById('sdp-ov');
+  if(ov){ov.classList.remove('open');ov.setAttribute('aria-hidden','true');}
+}
+function sucourseTimeTo24(raw){
+  const s=String(raw||'').trim().replace(/\s+/g,' ');
+  const m=s.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM|am|pm))?$/i);
+  if(!m)return null;
+  let h=parseInt(m[1],10);
+  const min=m[2];
+  const ap=(m[3]||'').toLowerCase();
+  if(!ap){
+    if(h>23)return null;
+    return String(h).padStart(2,'0')+':'+min;
+  }
+  if(ap==='pm'&&h<12)h+=12;
+  if(ap==='am'&&h===12)h=0;
+  if(h>23)return null;
+  return String(h).padStart(2,'0')+':'+min;
+}
+function parseSucourseSessionBody(body){
+  const b=String(body||'').replace(/\s+/g,' ').trim();
+  const mo='Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+  const endRe=new RegExp('\\s+('+mo+')\\s+(\\d{1,2}),\\s*(\\d{4})\\s*-\\s*('+mo+')\\s+(\\d{1,2}),\\s*(\\d{4})','i');
+  const em=endRe.exec(b);
+  if(!em)return null;
+  const rangeNote=em[1]+' '+em[2]+', '+em[3]+' – '+em[4]+' '+em[5]+', '+em[6];
+  const before=b.slice(0,em.index).trim();
+  const timeRe=/^(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\s+/i;
+  const tm=before.match(timeRe);
+  if(!tm)return null;
+  const start24=sucourseTimeTo24(tm[1]);
+  const end24=sucourseTimeTo24(tm[2]);
+  if(!start24||!end24)return null;
+  const mid=before.slice(tm[0].length).trim();
+  const dm=mid.match(/^([MTWRF])\s+(.+)$/);
+  if(!dm)return null;
+  const dowMap={M:1,T:2,W:3,R:4,F:5};
+  const dow=dowMap[dm[1]];
+  if(dow==null)return null;
+  const location=(dm[2]||'').trim()||'-';
+  return{startTime:start24,endTime:end24,dow,location,rangeNote};
+}
+function parseSucourseScheduleText(text){
+  const lines=String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const tailRe=/\s*-\s*([A-Za-z]{2,4})\s*(\d{3}[A-Za-z]?)\s*-\s*([A-Za-z0-9]+)(?=\s+Associated\s+Term:|\s*$)/i;
+  const sessionRe=/^(Class|Recitation|Discussion)\s+(.+)$/i;
+  let cur=null;
+  const slots=[];
+  const errs=[];
+  for(const line of lines){
+    const hm=line.match(tailRe);
+    if(hm){
+      const title=line.slice(0,line.length-hm[0].length).trim();
+      if(title)cur={title,dept:hm[1].toUpperCase(),num:hm[2],section:hm[3].trim()};
+      else errs.push('Gecersiz baslik: '+line.slice(0,70));
+      continue;
+    }
+    if(!cur)continue;
+    const sm=line.match(sessionRe);
+    if(!sm){
+      if(/^(Class|Recitation|Discussion)\s/i.test(line))errs.push('Satir okunamadi: '+line.slice(0,80));
+      continue;
+    }
+    const body=parseSucourseSessionBody(sm[2]);
+    if(!body){errs.push('Satir cozulemedi: '+line.slice(0,80));continue;}
+    slots.push({cur,kind:sm[1],body});
+  }
+  return{slots,errs};
+}
+function confirmSchedulePaste(){
+  if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
+  const ta=document.getElementById('sdp-ta');if(!ta)return;
+  const {slots,errs}=parseSucourseScheduleText(ta.value);
+  if(!slots.length){
+    alert('Hic ders satiri okunamadi.\n'+(errs.slice(0,6).join('\n')||'Metni kontrol edin.'));
+    return;
+  }
+  const lessonLayer=S.layers.find(l=>l.typeId==='lesson')||S.layers[0];
+  const tc=typeById('lesson');
+  const color=tc.color||'#2563eb';
+  let n=0;
+  slots.forEach(({cur,kind,body})=>{
+    const k=kind.toLowerCase();
+    let title=cur.title;
+    if(k==='recitation')title=title+' (Recitation)';
+    else if(k==='discussion')title=title+' (Discussion)';
+    else if(/R$/i.test(cur.num||''))title=title+' (Recitation)';
+    else if(/D$/i.test(cur.num||''))title=title+' (Discussion)';
+    const course=cur.dept+' '+cur.num;
+    const note=[body.location,body.rangeNote].filter(Boolean).join(' — ');
+    S.events.push({
+      id:uid(),
+      title,
+      typeId:'lesson',
+      course,
+      note,
+      startTime:body.startTime,
+      endTime:body.endTime,
+      recur:[body.dow],
+      date:null,
+      color,
+      layerId:lessonLayer.id
+    });
+    n++;
+  });
+  save();
+  closeSchedulePasteModal();
+  ta.value='';
+  rCal();
+  showSaved(n+' ders saati eklendi');
+  if(errs.length)alert('Uyari: '+errs.length+' satir atlandi.\n'+errs.slice(0,10).join('\n'));
+}
 function saveEv(){
   const title=(document.getElementById('ev-title').value||'').trim();
   if(!title){document.getElementById('ev-title').focus();return}
