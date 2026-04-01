@@ -216,13 +216,14 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .auth-boot-spin{width:28px;height:28px;border:3px solid var(--bd2);border-top-color:var(--ac);border-radius:50%;animation:auth-spin .75s linear infinite}
 @keyframes auth-spin{to{transform:rotate(360deg)}}
 .auth-boot-txt{font-size:14px;font-weight:500;color:var(--t2)}
-.login-scr{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+.login-scr{position:fixed;inset:0;z-index:1990;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;padding-bottom:max(24px,env(safe-area-inset-bottom));-webkit-tap-highlight-color:transparent}
 .login-scr.hidden{display:none!important}
 .login-box{max-width:380px;text-align:center}
 .login-box h1{font-size:20px;font-weight:600;letter-spacing:-.3px;margin-bottom:8px}
 .login-sub{font-size:13px;color:var(--t2);line-height:1.45;margin-bottom:22px}
-.btn-google{border:1px solid var(--bd);border-radius:var(--rl);background:var(--sf);color:var(--tx);font-size:13px;font-weight:600;font-family:var(--fn);padding:11px 22px;cursor:pointer;box-shadow:var(--sh-dp);transition:background .12s}
+.btn-google{border:1px solid var(--bd);border-radius:var(--rl);background:var(--sf);color:var(--tx);font-size:13px;font-weight:600;font-family:var(--fn);padding:11px 22px;cursor:pointer;box-shadow:var(--sh-dp);transition:background .12s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:48px}
 .btn-google:hover{background:var(--s3)}
+.btn-google:active{background:var(--s3);opacity:.95}
 .auth-msg{font-size:12px;color:var(--danger-tx);margin-top:14px;min-height:1.2em}
 #app-main{display:none;flex:1;width:100%;min-height:0;overflow:hidden;flex-direction:row}
 #app-main.visible{display:flex}
@@ -789,6 +790,18 @@ function fmt(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')
 function isMobile(){
   return (window.innerWidth<768)||(/Android|iPhone/i.test(navigator.userAgent||''));
 }
+function isAuthRedirectMobile(){
+  return /Android|iPhone|iPad/i.test(navigator.userAgent||'');
+}
+function googleCredFromRedirectResult(result){
+  if(!result)return null;
+  if(result.credential)return result.credential;
+  try{
+    const G=firebase.auth.GoogleAuthProvider;
+    if(G&&typeof G.credentialFromResult==='function')return G.credentialFromResult(result);
+  }catch(e){}
+  return null;
+}
 function syncViewUI(){
   const v=S.view;
   document.querySelectorAll('.vb').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
@@ -1233,7 +1246,16 @@ function signInGoogle(){
   const msg=document.getElementById('auth-msg');if(msg)msg.textContent='';
   const p=new firebase.auth.GoogleAuthProvider();
   p.addScope(GMAIL_SCOPE);
-  firebase.auth().signInWithPopup(p)
+  const auth=firebase.auth();
+  if(isAuthRedirectMobile()){
+    if(msg)msg.textContent='Google’a yönlendiriliyorsunuz…';
+    auth.signInWithRedirect(p).catch(err=>{
+      console.error(err);
+      if(msg)msg.textContent=(err&&err.message)||'Giris basarisiz';
+    });
+    return;
+  }
+  auth.signInWithPopup(p)
     .then(result=>{
       storeGmailTokensFromCredential(result.credential);
     })
@@ -3126,6 +3148,12 @@ function initFirebaseAuthFlow(){
   const localPersist=(P&&P.LOCAL!==undefined)?P.LOCAL:'local';
   return auth.setPersistence(localPersist)
     .catch(err=>{console.error('setPersistence LOCAL',err);})
+    .then(()=>auth.getRedirectResult())
+    .then(result=>{
+      const cred=googleCredFromRedirectResult(result);
+      if(cred)storeGmailTokensFromCredential(cred);
+    })
+    .catch(err=>{console.error('getRedirectResult',err);})
     .finally(()=>{startFirebaseAuthListener();});
 }
 /* ---- BASLANGIC ---- */
@@ -3142,7 +3170,7 @@ window.addEventListener('load',()=>{
     }).catch(()=>{});
   },0);
 });
-// Gmail: OAuth access token from signInWithPopup / reauthenticateWithPopup (gmail.readonly scope).
+// Gmail: OAuth access token — masaustu popup; mobil signInWithRedirect + getRedirectResult (gmail.readonly).
 </script>
 </body>
 </html>
