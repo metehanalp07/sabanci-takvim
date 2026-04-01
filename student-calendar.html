@@ -568,7 +568,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
     <button type="button" class="npt" id="tab-ann" onclick="setNotifTab('announcements')">Duyurular <span id="badge-ann" class="notif-badge" style="display:none">0</span></button>
   </div>
   <div id="rs-bd">
-    <button type="button" class="btn-mscan" id="btn-mscan" onclick="scanMail()">Mailleri Tara</button>
+    <button type="button" class="btn-mscan" id="btn-mscan" data-btn-label="Mailleri Tara (Mobil için şimdilik aktif değil)" onclick="scanMail()">Mailleri Tara (Mobil için şimdilik aktif değil)</button>
     <div id="notif-warn" class="notif-warn">Sabancı mailinizi profil ayarlarından ekleyin, maillerinizi tarayalım</div>
     <div id="notif-list" class="notif-list"></div>
   </div>
@@ -586,7 +586,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
     <button type="button" class="npt" id="mob-tab-ann" onclick="setNotifTab('announcements')">Duyurular <span id="mob-badge-ann" class="notif-badge" style="display:none">0</span></button>
   </div>
   <div class="nov-bd">
-    <button type="button" class="btn-mscan" id="btn-mscan-mob" onclick="scanMail()">Mailleri Tara</button>
+    <button type="button" class="btn-mscan" id="btn-mscan-mob" data-btn-label="Mailleri Tara" onclick="scanMail()">Mailleri Tara</button>
     <div id="notif-warn-mob" class="notif-warn">Sabancı mailinizi profil ayarlarından ekleyin, maillerinizi tarayalım</div>
     <div id="notif-list-mob" class="notif-list"></div>
   </div>
@@ -2859,12 +2859,16 @@ async function fetchWithAuth(url){
   return res;
 }
 
+function scanMailBtnLabel(el){
+  return(el&&el.getAttribute('data-btn-label'))||'Mailleri Tara';
+}
 async function scanMail(){
   const btn=document.getElementById('btn-mscan');
+  const btnM=document.getElementById('btn-mscan-mob');
   if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
-  const u=firebase.auth().currentUser;
   const sab=(S.settings&&S.settings.sabanciEmail||'').trim();
   if(btn){btn.disabled=true;btn.textContent='Taranıyor...';}
+  if(btnM){btnM.disabled=true;btnM.textContent='Taranıyor...';}
   window.debugMails=[];
   try{
     const accessToken=await getGmailAccessToken();
@@ -2927,7 +2931,8 @@ async function scanMail(){
     alert('Mail taramasi: '+((e&&e.message)||JSON.stringify(e)));
     console.error('Mail scan error:', e);
   }finally{
-    if(btn){btn.disabled=false;btn.textContent='Mailleri Tara';}
+    if(btn){btn.disabled=false;btn.textContent=scanMailBtnLabel(btn);}
+    if(btnM){btnM.disabled=false;btnM.textContent=scanMailBtnLabel(btnM);}
   }
 }
 
