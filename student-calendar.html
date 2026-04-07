@@ -147,6 +147,9 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .sdp-ta{width:100%;min-height:200px;max-height:45vh;padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r);background:var(--s2);color:var(--tx);font-size:11px;font-family:var(--mo);line-height:1.45;resize:vertical;outline:none;box-sizing:border-box}
 .sdp-ta:focus{border-color:var(--ac);background:var(--sf)}
 .sdp-hint{font-size:10px;color:var(--t3);line-height:1.4;margin-top:6px}
+.lay-ts,.aca-ts{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;padding:4px 0}
+.lay-ts label,.aca-ts label{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;color:var(--tx)}
+.lay-ts input,.aca-ts input{width:14px;height:14px;accent-color:var(--ac)}
 .mhd{padding:16px 16px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--sf);z-index:2}
 .mhd h2{font-size:14px;font-weight:600;order:1;flex:1;text-align:left}
 .mhd .mx{order:2;margin-left:auto;flex-shrink:0}
@@ -473,6 +476,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
       </div>
     </div>
     <button type="button" class="adb" style="margin-top:12px;width:100%" onclick="openSchedulePasteModal()"><span class="pi">&#128203;</span> Ders Programı Ekle</button>
+    <button type="button" class="adb" style="margin-top:6px;width:100%" onclick="openAcademicSettingsModal()"><span class="pi">&#128197;</span> Akademik takvim ayarları</button>
   </div>
   <div id="ls">
     <div class="sl">Katmanlar</div><div id="lw"></div>
@@ -481,6 +485,14 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
     <div class="mnv"><button id="mnp">&#8249;</button><span id="mnt"></span><button id="mnn">&#8250;</button></div>
     <div class="mgr" id="mnd"></div>
     <div class="mgr" id="mng"></div>
+  </div>
+  <div style="padding:10px 12px;border-top:1px solid var(--bd);flex-shrink:0">
+    <div class="sl" style="margin-bottom:8px">Takvime Aktar</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <button class="sb-io-btn" onclick="exportICS('lesson')">📅 Dersler (.ics)</button>
+      <button class="sb-io-btn" onclick="exportICS('exam')">📝 Sınavlar (.ics)</button>
+      <button class="sb-io-btn" onclick="exportICS('homework')">📋 Ödevler (.ics)</button>
+    </div>
   </div>
   <div class="sb-io">
     <button class="sb-io-btn" onclick="importData();closeSb()">&#8593; Yukle</button>
@@ -520,6 +532,13 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
         </div>
         <div class="prof-actions">
           <button type="button" class="prof-btn primary" onclick="saveProfileSettings()">Kaydet</button>
+        </div>
+      </div>
+      <div class="prof-sec">
+        <div class="prof-ttl">Akademik takvim</div>
+        <p style="font-size:10px;color:var(--t3);line-height:1.35;margin-bottom:8px">Dönem tarihleri, tatiller ve hangi türlerin döneme tabi olacağı.</p>
+        <div class="prof-actions" style="justify-content:stretch">
+          <button type="button" class="prof-btn primary" style="width:100%" onclick="openAcademicSettingsModal();closeProfilePanel()">Akademik takvim ayarları…</button>
         </div>
       </div>
       <div class="prof-sec">
@@ -618,6 +637,13 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
       </div>
       <div class="prof-actions">
         <button type="button" class="prof-btn primary" onclick="saveProfileSettingsMob()">Kaydet</button>
+      </div>
+    </div>
+    <div class="prof-sec" style="border:1px solid var(--bd);border-radius:var(--rl);margin-bottom:10px">
+      <div class="prof-ttl">Akademik takvim</div>
+      <p style="font-size:10px;color:var(--t3);line-height:1.35;margin-bottom:8px">Dönem tarihleri, tatiller ve döneme tabi türler.</p>
+      <div class="prof-actions" style="justify-content:stretch">
+        <button type="button" class="prof-btn primary" style="width:100%" onclick="openAcademicSettingsModal();closeProfileMob()">Akademik takvim ayarları…</button>
       </div>
     </div>
     <div class="prof-sec" style="border:1px solid var(--bd);border-radius:var(--rl);margin-bottom:10px">
@@ -743,14 +769,44 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 
 <!-- KATMAN MODAL -->
 <div class="ov" id="lov" onclick="if(event.target===this)closeLM()">
-  <div class="mb" style="width:340px;">
+  <div class="mb" style="width:380px;">
     <div class="mhd"><button type="button" class="mx" onclick="closeLM()" aria-label="Kapat"><span class="m-kic" aria-hidden="true">&#215;</span><span class="m-ktxt">Kapat</span></button><h2>Katman Ekle</h2><div class="mhd-sp" aria-hidden="true"></div></div>
     <div class="mbd">
       <div class="fg"><label>Katman Adi</label><input type="text" id="lay-name" placeholder="Lab, Proje, Staj..."></div>
-      <div class="fg"><label>Tur</label><select id="lay-type"></select></div>
+      <div class="fg"><label>Turler (birden fazla secilebilir)</label><div id="lay-types-wrap" class="lay-ts"></div></div>
       <div class="fg"><label>Renk</label><div class="cr" id="lay-colors"></div></div>
     </div>
     <div class="mft"><button class="bs" onclick="closeLM()">Iptal</button><button class="bp" onclick="saveL()">Ekle</button></div>
+  </div>
+</div>
+
+<!-- AKADEMIK TAKVIM AYARLARI -->
+<div class="ov ov-top" id="aca-ov" onclick="if(event.target===this)closeAcademicSettingsModal()" aria-hidden="true">
+  <div class="mb sdp-mb" style="width:min(480px,96vw)" onclick="event.stopPropagation()">
+    <div class="mhd">
+      <button type="button" class="mx" onclick="closeAcademicSettingsModal()" aria-label="Kapat"><span class="m-kic" aria-hidden="true">&#215;</span><span class="m-ktxt">Kapat</span></button>
+      <h2>Akademik takvim ayarlari</h2>
+      <div class="mhd-sp" aria-hidden="true"></div>
+    </div>
+    <div class="mbd">
+      <div class="fg">
+        <label for="aca-start">Donem baslangici</label>
+        <input type="date" id="aca-start">
+      </div>
+      <div class="fg">
+        <label for="aca-end">Donem bitisi</label>
+        <input type="date" id="aca-end">
+      </div>
+      <div class="fg">
+        <label>Donem araligina ve resmi tatillere tabi turler</label>
+        <p class="aca-hint">Secilen turlerdeki haftalik tekrarlar, donem disinda gosterilmez; tatil gunlerinde gizlenir.</p>
+        <div id="aca-types-wrap" class="aca-ts"></div>
+      </div>
+    </div>
+    <div class="mft">
+      <button type="button" class="bs" onclick="closeAcademicSettingsModal()">Iptal</button>
+      <button type="button" class="bp" onclick="saveAcademicSettings()">Kaydet</button>
+    </div>
   </div>
 </div>
 
@@ -784,6 +840,9 @@ const MOS=['Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','E
 const DYS=['Paz','Pzt','Sal','Car','Per','Cum','Cmt'];
 const DLS=['Pz','Pt','Sa','Ca','Pe','Cu','Ct'];
 const MIN_H=7,MAX_H=23,KEY='drs-tkv-v7',KEY_THEME='drs-tkv-theme';
+const HOLIDAY_CACHE_KEY='drs-tkv-nager-cache-v1';
+const HOLIDAY_CACHE_TTL_MS=365*24*60*60*1000;
+const HOLIDAY_PREFETCH_MAX_YEAR_OFFSET=12;
 let _themeMedia=null;
 const CX=70,CY=70,CR=62;
 
@@ -795,9 +854,9 @@ const FIXED_TYPES=[
 ];
 
 const DEFAULT_LAYERS=[
-  {id:'l1',name:'Ders Programi',typeId:'lesson',color:'#2563eb',vis:true},
-  {id:'l2',name:'Office Hours', typeId:'office',color:'#059669',vis:true},
-  {id:'l3',name:'Sinavlar',     typeId:'exam',  color:'#dc2626',vis:true},
+  {id:'l1',name:'Ders Programi',typeIds:['lesson'],typeId:'lesson',color:'#2563eb',vis:true},
+  {id:'l2',name:'Office Hours', typeIds:['office'],typeId:'office',color:'#059669',vis:true},
+  {id:'l3',name:'Sinavlar',     typeIds:['exam'],typeId:'exam',  color:'#dc2626',vis:true},
 ];
 
 const S={
@@ -805,12 +864,214 @@ const S={
   events:[], layers:JSON.parse(JSON.stringify(DEFAULT_LAYERS)),
   customTypes:[],
   notifications:[],
-  settings:{sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0},
+  settings:{
+    sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0,
+    academicTermStart:'',academicTermEnd:'',
+    academicRangeTypeIds:null
+  },
   dismissedKeys:new Set(),
   editId:null, selCol:{},
   clk:{s:{h:9,m:0,mode:'h'},e:{h:10,m:30,mode:'h'}},
   actTypeId:'lesson',
 };
+
+// Akademik takvim (varsayilan). Ders tekrar siniri ve tatil gosterimi burada.
+// Ileride: Sabanci Universitesi resmi akademik takvimini tek tikla dolduran "Sabanci donemi" onay kutusu
+// (preset) eklenebilir; simdilik kullanici panelde tarihleri elle giriyor.
+const ACADEMIC_CALENDAR={
+  defaultTermStart:'2026-02-16',
+  defaultTermEnd:'2026-05-22',
+  holidays:[
+    {date:'2026-03-19',title:'Ramazan Bayrami Arifesi'},
+    {date:'2026-03-20',title:'Ramazan Bayrami 1. Gun'},
+    {date:'2026-03-21',title:'Ramazan Bayrami 2. Gun'},
+    {date:'2026-03-22',title:'Ramazan Bayrami 3. Gun'},
+    {date:'2026-04-23',title:'23 Nisan Ulusal Egemenlik ve Cocuk Bayrami'},
+    {date:'2026-05-01',title:'Emek ve Dayanisma Gunu'},
+    {date:'2026-05-19',title:"19 Mayis Ataturk'u Anma, Genclik ve Spor Bayrami"}
+  ]
+};
+const EN_MON={
+  jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12
+};
+
+function layerTypeIds(l){
+  if(!l)return[];
+  if(Array.isArray(l.typeIds)&&l.typeIds.length)return l.typeIds.filter(Boolean);
+  if(l.typeId)return[l.typeId];
+  return['lesson'];
+}
+function normalizeLayers(layers){
+  if(!Array.isArray(layers)||!layers.length)return JSON.parse(JSON.stringify(DEFAULT_LAYERS));
+  return layers.map(l=>{
+    const typeIds=[...new Set(layerTypeIds(l))];
+    const o={...l,typeIds,typeId:typeIds[0]||'lesson'};
+    return o;
+  });
+}
+function findLayerForType(typeId){
+  const tid=typeId||'lesson';
+  return S.layers.find(l=>layerTypeIds(l).includes(tid));
+}
+function getDefaultTermBounds(){
+  const s=S.settings&&S.settings.academicTermStart;
+  const e=S.settings&&S.settings.academicTermEnd;
+  return{
+    start:(s&&String(s).trim())||ACADEMIC_CALENDAR.defaultTermStart,
+    end:(e&&String(e).trim())||ACADEMIC_CALENDAR.defaultTermEnd
+  };
+}
+function getAcademicRangeTypeIds(){
+  const a=S.settings&&S.settings.academicRangeTypeIds;
+  if(Array.isArray(a)&&a.length)return a.filter(Boolean);
+  return['lesson'];
+}
+// Dahili varsayilan + Nager.Date TR (localStorage yil bazli; TTL ~1 yil, gereksiz istek yok).
+let _nagerHolidayCache=null;
+function getHolidaysFromSettings(){
+  const by=new Map();
+  ACADEMIC_CALENDAR.holidays.forEach(h=>{if(h&&h.date)by.set(h.date,h.title||'Tatil');});
+  if(Array.isArray(_nagerHolidayCache))_nagerHolidayCache.forEach(h=>{if(h&&h.date)by.set(h.date,h.title||'Tatil');});
+  return[...by.entries()].map(([date,title])=>({date,title})).sort((a,b)=>a.date.localeCompare(b.date));
+}
+function yearsFromTermBounds(start,end){
+  const y1=parseInt(String(start||'').slice(0,4),10), y2=parseInt(String(end||'').slice(0,4),10);
+  const ys=new Set();
+  if(!isNaN(y1)&&!isNaN(y2)){
+    for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++)ys.add(y);
+  }
+  if(!ys.size){
+    const n=new Date().getFullYear();
+    ys.add(n);ys.add(n+1);
+  }
+  return[...ys].sort((a,b)=>a-b);
+}
+function yearsForHolidayPrefetch(){
+  const tb=getDefaultTermBounds();
+  const ys=new Set(yearsFromTermBounds(tb.start,tb.end));
+  const ny=new Date().getFullYear();
+  for(let i=0;i<=5;i++)ys.add(ny+i);
+  ys.add(ny-1);
+  let lo=Math.min(...ys), hi=Math.max(...ys);
+  lo=Math.min(lo,ny-1);
+  hi=Math.min(Math.max(hi,ny+5),ny+HOLIDAY_PREFETCH_MAX_YEAR_OFFSET);
+  const out=[];
+  for(let y=lo;y<=hi;y++)out.push(y);
+  return out;
+}
+function readHolidayCacheRaw(){
+  try{
+    const raw=localStorage.getItem(HOLIDAY_CACHE_KEY);
+    if(!raw)return{v:1,years:{}};
+    const d=JSON.parse(raw);
+    if(!d||typeof d.years!=='object')return{v:1,years:{}};
+    return d;
+  }catch(e){return{v:1,years:{}}}
+}
+function writeHolidayCacheRaw(obj){
+  try{localStorage.setItem(HOLIDAY_CACHE_KEY,JSON.stringify(obj))}catch(e){}
+}
+function getCachedYearItems(year){
+  const y=String(year);
+  const c=readHolidayCacheRaw();
+  const e=c.years[y];
+  if(!e||!Array.isArray(e.items))return null;
+  if(typeof e.t!=='number'||Date.now()-e.t>HOLIDAY_CACHE_TTL_MS)return null;
+  return e.items;
+}
+function setCachedYearItems(year,items){
+  const c=readHolidayCacheRaw();
+  c.years[String(year)]={t:Date.now(),items:items.slice()};
+  writeHolidayCacheRaw(c);
+}
+function mapNagerJsonToItems(arr){
+  const byDate=new Map();
+  (arr||[]).forEach(item=>{
+    const d=item&&item.date, title=((item&&item.localName)||(item&&item.name)||'Tatil').trim();
+    if(d&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&!byDate.has(d))byDate.set(d,{date:d,title:title||'Tatil'});
+  });
+  return[...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
+}
+function mergeLocalStorageYearsToFlat(years){
+  const by=new Map();
+  years.forEach(y=>{
+    const items=getCachedYearItems(y);
+    if(items)items.forEach(h=>{if(h&&h.date)by.set(h.date,h.title||'Tatil');});
+  });
+  return[...by.entries()].map(([date,title])=>({date,title})).sort((a,b)=>a.date.localeCompare(b.date));
+}
+async function fetchNagerTrHolidaysYear(year){
+  const url='https://date.nager.at/api/v3/PublicHolidays/'+encodeURIComponent(String(year))+'/TR';
+  const r=await fetch(url,{cache:'no-store',credentials:'omit'});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
+}
+function prefetchNagerHolidaysSilent(){
+  const years=yearsForHolidayPrefetch();
+  const applyFromStorage=()=>{
+    _nagerHolidayCache=mergeLocalStorageYearsToFlat(years);
+    rCal();
+  };
+  applyFromStorage();
+  const need=years.filter(y=>getCachedYearItems(y)===null);
+  if(!need.length)return;
+  Promise.all(need.map(y=>fetchNagerTrHolidaysYear(y).catch(()=>[])))
+    .then(batches=>{
+      need.forEach((y,i)=>{setCachedYearItems(y,mapNagerJsonToItems(batches[i]));});
+      applyFromStorage();
+    })
+    .catch(e=>{console.warn('prefetchNagerHolidaysSilent',e);});
+}
+function openAcademicSettingsModal(){
+  if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
+  try{closeSb();closeProfileMob();}catch(e){}
+  fillAcademicSettingsForm();
+  const ov=document.getElementById('aca-ov');
+  if(ov){ov.classList.add('open');ov.setAttribute('aria-hidden','false');}
+}
+function closeAcademicSettingsModal(){
+  const ov=document.getElementById('aca-ov');
+  if(ov){ov.classList.remove('open');ov.setAttribute('aria-hidden','true');}
+}
+function fillAcademicSettingsForm(){
+  const tb=getDefaultTermBounds();
+  const st=document.getElementById('aca-start');
+  const en=document.getElementById('aca-end');
+  if(st)st.value=(S.settings&&S.settings.academicTermStart)||tb.start;
+  if(en)en.value=(S.settings&&S.settings.academicTermEnd)||tb.end;
+  const wrap=document.getElementById('aca-types-wrap');
+  if(wrap){
+    const sel=new Set(getAcademicRangeTypeIds());
+    wrap.innerHTML='';
+    allTypes().forEach(t=>{
+      const lab=document.createElement('label');
+      const inp=document.createElement('input');
+      inp.type='checkbox';inp.dataset.tid=t.id;
+      inp.checked=sel.has(t.id);
+      lab.appendChild(inp);
+      lab.appendChild(document.createTextNode(t.name));
+      wrap.appendChild(lab);
+    });
+  }
+}
+function saveAcademicSettings(){
+  if(!firebase.auth().currentUser){alert('Once giris yapin.');return;}
+  S.settings=S.settings||{};
+  const st=document.getElementById('aca-start');
+  const en=document.getElementById('aca-end');
+  const sv=(st&&st.value)||'';
+  const ev=(en&&en.value)||'';
+  if(sv&&ev&&sv>ev){alert('Bitis tarihi baslangictan once olamaz.');return;}
+  S.settings.academicTermStart=sv;
+  S.settings.academicTermEnd=ev;
+  const ids=[...new Set(Array.from(document.querySelectorAll('#aca-types-wrap input[type=checkbox]:checked')).map(i=>i.dataset.tid).filter(Boolean))];
+  S.settings.academicRangeTypeIds=ids.length?ids:['lesson'];
+  save();
+  closeAcademicSettingsModal();
+  prefetchNagerHolidaysSilent();
+  rCal();
+  showSaved('Akademik takvim kaydedildi');
+}
 
 function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5)}
 function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -857,6 +1118,51 @@ function closeSb(){
 function toLocalYMD(dt){
   const d=new Date(dt);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function ymdInRange(ymd,start,end){
+  if(start&&ymd<start)return false;
+  if(end&&ymd>end)return false;
+  return true;
+}
+function dateBoundsFromText(s){
+  const txt=String(s||'');
+  const m=txt.match(/\b([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})\s*[–-]\s*([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})\b/i);
+  if(!m)return null;
+  const m1=EN_MON[(m[1]||'').toLowerCase()],m2=EN_MON[(m[4]||'').toLowerCase()];
+  if(!m1||!m2)return null;
+  const start=m[3]+'-'+String(m1).padStart(2,'0')+'-'+String(parseInt(m[2],10)).padStart(2,'0');
+  const end=m[6]+'-'+String(m2).padStart(2,'0')+'-'+String(parseInt(m[5],10)).padStart(2,'0');
+  return{start,end};
+}
+function lessonDateBounds(ev){
+  let start=ev&&ev.recurStart, end=ev&&ev.recurEnd;
+  if((!start||!end)&&ev&&ev.note){
+    const b=dateBoundsFromText(ev.note);
+    if(b){if(!start)start=b.start;if(!end)end=b.end;}
+  }
+  const fb=getDefaultTermBounds();
+  if(!start)start=fb.start;
+  if(!end)end=fb.end;
+  return{start,end};
+}
+function holidayByDate(ymd){return getHolidaysFromSettings().find(h=>h.date===ymd)||null}
+function isAcademicHoliday(ymd){return !!holidayByDate(ymd)}
+function holidayEventForDate(date){
+  const ds=toLocalYMD(date),h=holidayByDate(ds);
+  if(!h)return null;
+  return{
+    id:'holiday-'+ds,
+    title:'Tatil: '+h.title,
+    typeId:'exam',
+    course:'Akademik Takvim',
+    note:'Resmi tatil / ders yok',
+    startTime:'09:00',
+    endTime:'09:30',
+    recur:[],
+    date:ds,
+    color:'#b91c1c',
+    layerId:''
+  };
 }
 function openAddMob(){openAdd(toLocalYMD(S.cur),null)}
 let _rzT=null;
@@ -926,7 +1232,7 @@ function loadSaved(){
     const raw=localStorage.getItem(KEY);if(!raw)return false;
     const d=JSON.parse(raw);if(!Array.isArray(d.events))return false;
     S.events=d.events;
-    S.layers=d.layers||JSON.parse(JSON.stringify(DEFAULT_LAYERS));
+    S.layers=normalizeLayers(d.layers||JSON.parse(JSON.stringify(DEFAULT_LAYERS)));
     S.customTypes=d.customTypes||[];
     S.notifications=Array.isArray(d.notifications)?d.notifications:[];
     return true;
@@ -946,7 +1252,7 @@ function importData(){
       try{
         const d=JSON.parse(ev.target.result);
         if(!Array.isArray(d.events))throw new Error('Gecersiz format');
-        S.events=d.events;S.layers=d.layers||S.layers;S.customTypes=d.customTypes||[];
+        S.events=d.events;S.layers=normalizeLayers(d.layers||S.layers);S.customTypes=d.customTypes||[];
         if(Array.isArray(d.notifications))S.notifications=d.notifications;
         if(d.settings&&typeof d.settings==='object')S.settings={...S.settings,...d.settings};
         save();rLayers();rCal();rNotifications();applyProfileUI();showSaved('Yuklendi');
@@ -955,12 +1261,123 @@ function importData(){
   };inp.click();
 }
 
+function exportICS(typeFilter){
+  if(!firebase.auth().currentUser){alert('Önce giriş yapın');return;}
+  let events=[];
+  if(typeFilter==='lesson'){
+    events=(S.events||[]).filter(ev=>ev.recur&&ev.recur.length>0);
+  }else if(typeFilter==='exam'){
+    events=(S.events||[]).filter(ev=>ev.typeId==='exam'&&ev.date);
+  }else if(typeFilter==='homework'){
+    events=(S.events||[]).filter(ev=>ev.typeId==='homework'&&ev.date);
+  }else return;
+  const lines=[];
+  lines.push('BEGIN:VCALENDAR');
+  lines.push('VERSION:2.0');
+  lines.push('PRODID:-//SabancıTakvim//TR');
+  lines.push('CALSCALE:GREGORIAN');
+  lines.push('X-WR-TIMEZONE:Europe/Istanbul');
+  if(typeFilter==='lesson'){
+    const termStart=(S.settings&&S.settings.academicTermStart)||ACADEMIC_CALENDAR.defaultTermStart;
+    const termEnd=(S.settings&&S.settings.academicTermEnd)||ACADEMIC_CALENDAR.defaultTermEnd;
+    const untilDay=String(termEnd).replace(/-/g,'');
+    const BY=['SU','MO','TU','WE','TH','FR','SA'];
+    events.forEach(ev=>{
+      const first=exportICSFirstRecurDayYmd(termStart,ev.recur);
+      if(!first)return;
+      const byday=[...new Set((ev.recur||[]).map(Number))].sort((a,b)=>a-b).map(d=>BY[d]).join(',');
+      const st=exportICSTimeCompact(ev.startTime||'09:00');
+      const en=exportICSTimeCompact(ev.endTime||'10:30');
+      const sum=exportICSSummaryLesson(ev);
+      const desc=exportICSEscape(ev.note||'');
+      lines.push('BEGIN:VEVENT');
+      lines.push('UID:'+String(ev.id||'ev')+'@sabanci-takvim');
+      lines.push('SUMMARY:'+exportICSEscape(sum));
+      lines.push('DESCRIPTION:'+desc);
+      lines.push('DTSTART;TZID=Europe/Istanbul:'+first+'T'+st);
+      lines.push('DTEND;TZID=Europe/Istanbul:'+first+'T'+en);
+      lines.push('RRULE:FREQ=WEEKLY;BYDAY='+byday+';UNTIL='+untilDay+'T235959Z');
+      lines.push('END:VEVENT');
+    });
+  }else{
+    events.forEach(ev=>{
+      const d=String(ev.date||'').replace(/-/g,'');
+      if(!d||d.length!==8)return;
+      const st=exportICSTimeCompact(ev.startTime||'09:00');
+      const en=exportICSTimeCompact(ev.endTime||'10:30');
+      const sum=exportICSSummaryExamHw(ev);
+      const desc=exportICSEscape(ev.note||'');
+      lines.push('BEGIN:VEVENT');
+      lines.push('UID:'+String(ev.id||'ev')+'@sabanci-takvim');
+      lines.push('SUMMARY:'+exportICSEscape(sum));
+      lines.push('DESCRIPTION:'+desc);
+      lines.push('DTSTART;TZID=Europe/Istanbul:'+d+'T'+st);
+      lines.push('DTEND;TZID=Europe/Istanbul:'+d+'T'+en);
+      lines.push('END:VEVENT');
+    });
+  }
+  lines.push('END:VCALENDAR');
+  const body=lines.map(exportICSFoldLine).join('\r\n')+'\r\n';
+  const blob=new Blob([body],{type:'text/calendar;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=typeFilter==='lesson'?'sabanci-dersler.ics':typeFilter==='exam'?'sabanci-sinavlar.ics':'sabanci-odevler.ics';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function exportICSEscape(s){
+  return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r\n/g,'\\n').replace(/\n/g,'\\n').replace(/\r/g,'\\n');
+}
+function exportICSFoldLine(line){
+  if(line.length<=75)return line;
+  let out='';
+  let rest=line;
+  while(rest.length>75){
+    out+=rest.slice(0,75)+'\r\n ';
+    rest=rest.slice(75);
+  }
+  return out+rest;
+}
+function exportICSTimeCompact(t){
+  const m=String(t||'00:00').match(/^(\d{1,2}):(\d{2})$/);
+  if(!m)return'000000';
+  return String(parseInt(m[1],10)).padStart(2,'0')+String(parseInt(m[2],10)).padStart(2,'0')+'00';
+}
+function exportICSFirstRecurDayYmd(termStartStr,recur){
+  const parts=String(termStartStr||'').split('-');
+  if(parts.length!==3)return null;
+  const y=parseInt(parts[0],10), mo=parseInt(parts[1],10)-1, da=parseInt(parts[2],10);
+  if(isNaN(y)||isNaN(mo)||isNaN(da))return null;
+  const start=new Date(y,mo,da,12,0,0,0);
+  const want=new Set((recur||[]).map(Number));
+  for(let i=0;i<400;i++){
+    const d=new Date(start);
+    d.setDate(start.getDate()+i);
+    if(want.has(d.getDay())){
+      return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+    }
+  }
+  return null;
+}
+function exportICSSummaryLesson(ev){
+  const t=(ev.title||'').trim();
+  const c=(ev.course||'').trim();
+  if(c)return t+' - '+c;
+  return t;
+}
+function exportICSSummaryExamHw(ev){
+  const t=(ev.title||'').trim();
+  const c=(ev.course||'').trim();
+  if(c)return t+' - '+c;
+  return t;
+}
+
 function loadUserData(uid){
   return firebase.firestore().collection('users').doc(uid).get().then(snap=>{
     if(snap.exists){
       const d=snap.data();
       S.events=Array.isArray(d.events)?d.events:[];
-      S.layers=d.layers&&d.layers.length?d.layers:JSON.parse(JSON.stringify(DEFAULT_LAYERS));
+      S.layers=normalizeLayers(d.layers&&d.layers.length?d.layers:JSON.parse(JSON.stringify(DEFAULT_LAYERS)));
       S.customTypes=Array.isArray(d.customTypes)?d.customTypes:[];
       S.notifications=Array.isArray(d.notifications)?d.notifications:[];
       if(d.settings&&typeof d.settings==='object')S.settings={...S.settings,...d.settings};
@@ -1182,9 +1599,7 @@ function saveProfileSettings(){
   const vRaw=se?se.value:'';
   const v=validateSabanciEmail(vRaw);
   if(v===null){alert('Sabancı mail formatı hatalı. Örn: ad.soyad@sabanciuniv.edu');return;}
-  S.settings=S.settings||{sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0};
-  S.settings.sabanciEmail=v;
-  S.settings.scanPeriod=(sp&&sp.value)||'manual';
+  S.settings={...(S.settings||{}),sabanciEmail:v,scanPeriod:(sp&&sp.value)||'manual'};
   save();
   applyProfileUI();
   showSaved('Kaydedildi');
@@ -1198,9 +1613,7 @@ function saveProfileSettingsMob(){
   const vRaw=se?se.value:'';
   const v=validateSabanciEmail(vRaw);
   if(v===null){alert('Sabancı mail formatı hatalı. Örn: ad.soyad@sabanciuniv.edu');return;}
-  S.settings=S.settings||{sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0};
-  S.settings.sabanciEmail=v;
-  S.settings.scanPeriod=(sp&&sp.value)||'manual';
+  S.settings={...(S.settings||{}),sabanciEmail:v,scanPeriod:(sp&&sp.value)||'manual'};
   save();
   applyProfileUI();
   showSaved('Kaydedildi');
@@ -1224,8 +1637,7 @@ function closeProfileMob(){
   o.setAttribute('aria-hidden','true');
 }
 function toggleSoundSetting(){
-  S.settings=S.settings||{sabanciEmail:'',scanPeriod:'manual',soundEnabled:false,lastMailScanAt:0};
-  S.settings.soundEnabled=!S.settings.soundEnabled;
+  S.settings={...(S.settings||{}),soundEnabled:!(S.settings&&S.settings.soundEnabled)};
   save();
   applyProfileUI();
 }
@@ -1301,6 +1713,7 @@ function applyAuthState(user){
   const ov=document.getElementById('login-overlay'),app=document.getElementById('app-main'),msg=document.getElementById('auth-msg');
   if(msg)msg.textContent='';
   if(!user){
+    _nagerHolidayCache=null;
     ov.classList.remove('hidden');app.classList.remove('visible');
     return;
   }
@@ -1312,6 +1725,7 @@ function applyAuthState(user){
     applyProfileUI();
     return loadDismissedKeys(user.uid).then(()=>{
       rLayers();rCal();rNotifications();
+      prefetchNagerHolidaysSilent();
       maybeAutoScan();
     });
   }).catch(e=>{
@@ -1338,11 +1752,11 @@ function maybeAutoScan(){
 function rLayers(){
   const w=document.getElementById('lw');if(!w)return;w.innerHTML='';
   S.layers.forEach(l=>{
-    const t=typeById(l.typeId);
+    const tnames=layerTypeIds(l).map(id=>typeById(id).name).join(', ');
     const row=document.createElement('div');row.className='lr';
     row.innerHTML=
       '<div class="ld" style="background:'+l.color+'"></div>'+
-      '<div class="ln">'+l.name+'<small>'+t.name+'</small></div>'+
+      '<div class="ln">'+l.name+'<small>'+escHtml(tnames)+'</small></div>'+
       '<button class="ldl btn-katman-sil" data-id="'+l.id+'">&#215;</button>'+
       '<button class="tog btn-katman-tog '+(l.vis?'on':'off')+'" data-id="'+l.id+'"></button>';
     w.appendChild(row);
@@ -1359,12 +1773,19 @@ function delL(id){
 function openLM(){
   closeSb();
   document.getElementById('lay-name').value='';
-  // Dropdown'u TUM turlerle doldur (sabit + custom)
-  const sel=document.getElementById('lay-type');
-  sel.innerHTML='';
-  allTypes().forEach(t=>{
-    const o=document.createElement('option');o.value=t.id;o.textContent=t.name;sel.appendChild(o);
-  });
+  const wrap=document.getElementById('lay-types-wrap');
+  if(wrap){
+    wrap.innerHTML='';
+    allTypes().forEach((t,i)=>{
+      const lab=document.createElement('label');
+      const inp=document.createElement('input');
+      inp.type='checkbox';inp.dataset.tid=t.id;
+      inp.checked=(i===0);
+      lab.appendChild(inp);
+      lab.appendChild(document.createTextNode(t.name));
+      wrap.appendChild(lab);
+    });
+  }
   rCP('lay-colors',COLS[0]);
   document.getElementById('lov').classList.add('open');
   setTimeout(()=>document.getElementById('lay-name').focus(),80);
@@ -1373,9 +1794,10 @@ function closeLM(){document.getElementById('lov').classList.remove('open')}
 function saveL(){
   const name=document.getElementById('lay-name').value.trim();
   if(!name){document.getElementById('lay-name').focus();return}
-  const typeId=document.getElementById('lay-type').value;
+  const typeIds=[...new Set(Array.from(document.querySelectorAll('#lay-types-wrap input[type=checkbox]:checked')).map(i=>i.dataset.tid).filter(Boolean))];
+  if(!typeIds.length){alert('En az bir tur secin.');return}
   const color=S.selCol['lay-colors']||COLS[0];
-  S.layers.push({id:uid(),name,typeId,color,vis:true});
+  S.layers.push({id:uid(),name,typeIds,typeId:typeIds[0],color,vis:true});
   save();rLayers();closeLM();
 }
 
@@ -1631,6 +2053,9 @@ function parseSucourseSessionBody(body){
   const em=endRe.exec(b);
   if(!em)return null;
   const rangeNote=em[1]+' '+em[2]+', '+em[3]+' – '+em[4]+' '+em[5]+', '+em[6];
+  const m1=EN_MON[(em[1]||'').toLowerCase()],m2=EN_MON[(em[4]||'').toLowerCase()];
+  const rangeStart=em[3]+'-'+String(m1).padStart(2,'0')+'-'+String(parseInt(em[2],10)).padStart(2,'0');
+  const rangeEnd=em[6]+'-'+String(m2).padStart(2,'0')+'-'+String(parseInt(em[5],10)).padStart(2,'0');
   const before=b.slice(0,em.index).trim();
   const timeRe=/^(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\s+/i;
   const tm=before.match(timeRe);
@@ -1645,7 +2070,7 @@ function parseSucourseSessionBody(body){
   const dow=dowMap[dm[1]];
   if(dow==null)return null;
   const location=(dm[2]||'').trim()||'-';
-  return{startTime:start24,endTime:end24,dow,location,rangeNote};
+  return{startTime:start24,endTime:end24,dow,location,rangeNote,rangeStart,rangeEnd};
 }
 function parseSucourseScheduleText(text){
   const lines=String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -1682,7 +2107,7 @@ function confirmSchedulePaste(){
     alert('Hic ders satiri okunamadi.\n'+(errs.slice(0,6).join('\n')||'Metni kontrol edin.'));
     return;
   }
-  const lessonLayer=S.layers.find(l=>l.typeId==='lesson')||S.layers[0];
+  const lessonLayer=findLayerForType('lesson')||S.layers[0];
   const tc=typeById('lesson');
   const color=tc.color||'#2563eb';
   let n=0;
@@ -1704,6 +2129,8 @@ function confirmSchedulePaste(){
       startTime:body.startTime,
       endTime:body.endTime,
       recur:[body.dow],
+      recurStart:body.rangeStart||null,
+      recurEnd:body.rangeEnd||null,
       date:null,
       color,
       layerId:lessonLayer.id
@@ -1729,7 +2156,7 @@ function saveEv(){
   const color=S.selCol['ev-colors']||COLS[0];
   const startTime=fmt(S.clk.s.h,S.clk.s.m);
   const endTime=fmt(S.clk.e.h,S.clk.e.m);
-  const ml=S.layers.find(l=>l.typeId===typeId);
+  const ml=findLayerForType(typeId);
   const layerId=ml?ml.id:(S.layers[0]?S.layers[0].id:'l1');
   const ev={
     id:S.editId||uid(),title,typeId,
@@ -1868,11 +2295,22 @@ function wkStart(d){const day=d.getDay(),diff=day===0?-6:1-day,s=new Date(d);s.s
 function visL(){return new Set(S.layers.filter(l=>l.vis).map(l=>l.id))}
 function evForDate(date){
   const dow=date.getDay(),ds=toLocalYMD(date),vis=visL();
-  return S.events.filter(ev=>{
+  const base=S.events.filter(ev=>{
     if(!vis.has(ev.layerId))return false;
-    if(ev.recur&&ev.recur.length>0)return ev.recur.includes(dow);
+    if(ev.recur&&ev.recur.length>0){
+      if(!ev.recur.includes(dow))return false;
+      if(getAcademicRangeTypeIds().includes(ev.typeId||'')){
+        const b=lessonDateBounds(ev);
+        if(!ymdInRange(ds,b.start,b.end))return false;
+        if(isAcademicHoliday(ds))return false;
+      }
+      return true;
+    }
     return ev.date===ds;
   });
+  const holidayEv=holidayEventForDate(date);
+  if(holidayEv)base.push(holidayEv);
+  return base;
 }
 function clamp(n,a,b){return Math.max(a,Math.min(b,n))}
 function timeToMinutes(t){const m=String(t||'').match(/^(\d{1,2}):(\d{2})$/);if(!m)return null;return parseInt(m[1],10)*60+parseInt(m[2],10)}
@@ -3238,7 +3676,7 @@ function notifAddCal(id){
   if(!n||n.status!=='pending')return;
   if(!n.date){alert('Tarih bulunamadi; takvime eklenemedi.');return;}
   const typeId=(n.kind==='homework')?'homework':'exam';
-  const layer=S.layers.find(l=>l.typeId===typeId)||S.layers.find(l=>l.typeId==='exam');
+  const layer=findLayerForType(typeId)||findLayerForType('exam');
   const layerId=layer?layer.id:(S.layers[0]?S.layers[0].id:'l1');
   const tc=typeById(typeId);
   const title=notifTitle(n);
