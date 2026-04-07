@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ders Takvimi</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://apis.google.com/js/api.js"></script>
@@ -49,14 +49,7 @@ html[data-theme="dark"]{
 }
 html{color-scheme:light}
 html[data-theme="dark"]{color-scheme:dark}
-html,body{
-  position:fixed;
-  width:100%;
-  left:0;
-  top:0;
-  overflow:hidden;
-  height:100%;
-}
+html,body{height:100%;overflow:hidden}
 body{font-family:var(--fn);font-size:13px;color:var(--tx);background:var(--bg);display:flex;height:100%}
 #sb{width:240px;min-width:240px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
 #an{padding:18px 16px 14px;border-bottom:1px solid var(--bd)}
@@ -87,17 +80,20 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .adb:hover{background:var(--s3);color:var(--t2)}
 .pi{width:14px;height:14px;border-radius:3px;border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
 #mc{padding:12px 12px 14px;border-top:1px solid var(--bd);flex-shrink:0}
-.mnv{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.mnv{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:10px}
 .mnv span{font-size:12px;font-weight:500}
 .mnv button{border:none;background:none;cursor:pointer;color:var(--t2);font-size:14px;padding:2px 5px;border-radius:4px}
 .mnv button:hover{background:var(--s3)}
+#mc-arrow{display:inline-block;min-width:1em;font-size:12px;line-height:1;color:var(--t2);flex-shrink:0}
+.mnv #mnt{flex:1;text-align:center}
+#mc-grid{display:grid;grid-template-columns:1fr;gap:0;align-content:start}
 .mgr{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;text-align:center}
 .mdo{font-size:9px;font-weight:600;color:var(--t3);padding-bottom:5px;text-transform:uppercase}
 .md{font-size:11px;color:var(--t2);padding:3px 1px;border-radius:4px;cursor:pointer;transition:background .1s;font-family:var(--mo)}
 .md:hover{background:var(--s3);color:var(--tx)}.md.today{background:var(--ac);color:var(--on-ac);font-weight:500}.md.empty{cursor:default}
 .md.hev::after{content:"";display:block;width:3px;height:3px;border-radius:50%;background:var(--ac);margin:1px auto 0}
 .md.today.hev::after{background:rgba(255,255,255,.7)}
-#main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);max-width:100%;overflow-x:hidden}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
 #tb{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--sf);border-bottom:1px solid var(--bd);flex-shrink:0}
 /* Right sidebar (notifications) - desktop/tablet */
 #rs{width:0;display:none;flex-direction:column;background:var(--sf);border-left:1px solid var(--bd);overflow:hidden}
@@ -240,7 +236,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .btn-google:hover{background:var(--s3)}
 .btn-google:active{background:var(--s3);opacity:.95}
 .auth-msg{font-size:12px;color:var(--danger-tx);margin-top:14px;min-height:1.2em}
-#app-main{display:none;flex:1;width:100%;min-height:0;overflow:hidden;flex-direction:row;max-width:100%;overflow-x:hidden}
+#app-main{display:none;flex:1;width:100%;min-height:0;overflow:hidden;flex-direction:row}
 #app-main.visible{display:flex}
 .user-bar{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
 .prof-dd{position:absolute;right:12px;top:54px;z-index:120;background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);box-shadow:var(--sh-dp);width:320px;max-width:min(92vw,360px);display:none;overflow:hidden}
@@ -395,6 +391,8 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
   #mc .md{font-size:10px;padding:2px 1px}
   #mc .mcn{font-size:10px}
   #mc .mgr{gap:0}
+  #mc-grid{display:none}
+  .mnv{cursor:pointer;user-select:none;-webkit-user-select:none}
   .mob-fab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
   #tb{padding:6px 10px;flex-wrap:wrap;gap:4px}
   #eov{align-items:stretch;justify-content:stretch;padding:0}
@@ -498,9 +496,16 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
     <div class="sl">Katmanlar</div><div id="lw"></div>
   </div>
   <div id="mc">
-    <div class="mnv"><button id="mnp">&#8249;</button><span id="mnt"></span><button id="mnn">&#8250;</button></div>
-    <div class="mgr" id="mnd"></div>
-    <div class="mgr" id="mng"></div>
+    <div class="mnv" onclick="toggleMiniCal()">
+      <span id="mc-arrow" aria-hidden="true">▸</span>
+      <button type="button" id="mnp">&#8249;</button>
+      <span id="mnt"></span>
+      <button type="button" id="mnn">&#8250;</button>
+    </div>
+    <div id="mc-grid">
+      <div class="mgr" id="mnd"></div>
+      <div class="mgr" id="mng"></div>
+    </div>
   </div>
   <div style="padding:10px 12px;border-top:1px solid var(--bd);flex-shrink:0">
     <div class="sl" style="margin-bottom:8px">Takvime Aktar</div>
@@ -2526,7 +2531,20 @@ function rMonth(){
   h+='</div>';
   mvEl.innerHTML=h;mvEl.style.display='flex';
 }
+function toggleMiniCal(){
+  if(!isMobile())return;
+  const g=document.getElementById('mc-grid');
+  const arrow=document.getElementById('mc-arrow');
+  if(!g)return;
+  const cur=window.getComputedStyle(g).display;
+  const open=cur!=='none';
+  g.style.display=open?'none':'grid';
+  if(arrow)arrow.textContent=open?'▸':'▾';
+}
 function rMini(){
+  const g=document.getElementById('mc-grid');
+  let keepOpen=false;
+  if(isMobile()&&g)keepOpen=window.getComputedStyle(g).display!=='none';
   const d=S.cur,yr=d.getFullYear(),mo=d.getMonth();
   document.getElementById('mnt').textContent=MOS[mo].slice(0,3)+' '+yr;
   document.getElementById('mnd').innerHTML=['Pt','Sa','Ca','Pe','Cu','Ct','Pz'].map(x=>'<div class="mdo">'+x+'</div>').join('');
@@ -2540,6 +2558,13 @@ function rMini(){
     h+='<div class="md'+(isT?' today':'')+(hasEv?' hev':'')+'" onclick="jumpTo('+yr+','+mo+','+day+')">'+day+'</div>';
   }
   document.getElementById('mng').innerHTML=h;
+  if(isMobile()&&g){
+    g.style.display=keepOpen?'grid':'none';
+    const ar=document.getElementById('mc-arrow');
+    if(ar)ar.textContent=keepOpen?'▾':'▸';
+  }else if(g){
+    g.style.display='';
+  }
 }
 function jumpTo(y,m,day){
   S.cur=new Date(y,m,day);
@@ -2547,8 +2572,14 @@ function jumpTo(y,m,day){
   if(S.view==='month')rCal();
   else setView('week');
 }
-document.getElementById('mnp').onclick=()=>{S.cur.setMonth(S.cur.getMonth()-1);rCal()};
-document.getElementById('mnn').onclick=()=>{S.cur.setMonth(S.cur.getMonth()+1);rCal()};
+document.getElementById('mnp').onclick=e=>{
+  e.stopPropagation();
+  S.cur.setMonth(S.cur.getMonth()-1);rCal();
+};
+document.getElementById('mnn').onclick=e=>{
+  e.stopPropagation();
+  S.cur.setMonth(S.cur.getMonth()+1);rCal();
+};
 
 /* ---- GMAIL + BILDIRIMLER ---- */
 const GMAIL_SCOPE='https://www.googleapis.com/auth/gmail.readonly';
