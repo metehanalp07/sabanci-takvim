@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Ders Takvimi</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://apis.google.com/js/api.js"></script>
@@ -49,8 +49,15 @@ html[data-theme="dark"]{
 }
 html{color-scheme:light}
 html[data-theme="dark"]{color-scheme:dark}
-html,body{height:100%;overflow:hidden}
-body{font-family:var(--fn);font-size:13px;color:var(--tx);background:var(--bg);display:flex;height:100vh}
+html,body{
+  position:fixed;
+  width:100%;
+  left:0;
+  top:0;
+  overflow:hidden;
+  height:100%;
+}
+body{font-family:var(--fn);font-size:13px;color:var(--tx);background:var(--bg);display:flex;height:100%}
 #sb{width:240px;min-width:240px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
 #an{padding:18px 16px 14px;border-bottom:1px solid var(--bd)}
 #an h1{font-size:14px;font-weight:600;letter-spacing:-.3px}
@@ -90,7 +97,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .md:hover{background:var(--s3);color:var(--tx)}.md.today{background:var(--ac);color:var(--on-ac);font-weight:500}.md.empty{cursor:default}
 .md.hev::after{content:"";display:block;width:3px;height:3px;border-radius:50%;background:var(--ac);margin:1px auto 0}
 .md.today.hev::after{background:rgba(255,255,255,.7)}
-#main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);max-width:100%;overflow-x:hidden}
 #tb{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--sf);border-bottom:1px solid var(--bd);flex-shrink:0}
 /* Right sidebar (notifications) - desktop/tablet */
 #rs{width:0;display:none;flex-direction:column;background:var(--sf);border-left:1px solid var(--bd);overflow:hidden}
@@ -233,7 +240,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .btn-google:hover{background:var(--s3)}
 .btn-google:active{background:var(--s3);opacity:.95}
 .auth-msg{font-size:12px;color:var(--danger-tx);margin-top:14px;min-height:1.2em}
-#app-main{display:none;flex:1;width:100%;min-height:0;overflow:hidden;flex-direction:row}
+#app-main{display:none;flex:1;width:100%;min-height:0;overflow:hidden;flex-direction:row;max-width:100%;overflow-x:hidden}
 #app-main.visible{display:flex}
 .user-bar{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
 .prof-dd{position:absolute;right:12px;top:54px;z-index:120;background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);box-shadow:var(--sh-dp);width:320px;max-width:min(92vw,360px);display:none;overflow:hidden}
@@ -282,7 +289,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .mob-wk-head-row{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:stretch;position:sticky;top:0;z-index:5;background:var(--sf);border-bottom:1px solid var(--bd)}
 .mob-wk-corner{width:52px;min-width:52px;flex-shrink:0;position:sticky;left:0;z-index:7;background:var(--sf);border-right:1px solid var(--bd);box-shadow:2px 0 6px rgba(0,0,0,.04)}
 .mob-wk-dh-wrap{display:flex;flex-direction:row;flex-wrap:nowrap}
-.mob-wk-head{flex:0 0 calc((100vw - 52px)/var(--mw-cols,3));min-width:calc((100vw - 52px)/var(--mw-cols,3));max-width:calc((100vw - 52px)/var(--mw-cols,3));text-align:center;padding:8px 4px;border-right:1px solid var(--bd);background:var(--sf);box-sizing:border-box}
+.mob-wk-head{flex:0 0 calc((100% - 52px)/var(--mw-cols,3));min-width:calc((100% - 52px)/var(--mw-cols,3));max-width:calc((100% - 52px)/var(--mw-cols,3));text-align:center;padding:8px 4px;border-right:1px solid var(--bd);background:var(--sf);box-sizing:border-box}
 .mob-wk-head .mw-d{font-size:9px;font-weight:600;color:var(--t3);text-transform:uppercase}
 .mob-wk-head .mw-n{font-size:18px;font-family:var(--mo);color:var(--t2);margin-top:2px}
 .mob-wk-head.tod .mw-n{background:var(--ac);color:var(--on-ac);width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin:4px auto 0;font-weight:600;font-size:15px}
@@ -290,7 +297,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .mob-wk-ts{width:52px;min-width:52px;flex-shrink:0;position:sticky;left:0;z-index:4;background:var(--sf);border-right:1px solid var(--bd);align-self:flex-start;box-shadow:2px 0 6px rgba(0,0,0,.04)}
 .mob-wk-ts .mts{height:var(--mob-row-h,56px);border-bottom:1px solid var(--bd);font-size:9px;color:var(--t3);font-family:var(--mo);display:flex;align-items:flex-start;justify-content:flex-end;padding:4px 6px 0 0;box-sizing:border-box}
 .mob-wk-days{display:flex;flex-direction:row;flex-wrap:nowrap}
-.mob-wk-dcol{flex:0 0 calc((100vw - 52px)/var(--mw-cols,3));min-width:calc((100vw - 52px)/var(--mw-cols,3));max-width:calc((100vw - 52px)/var(--mw-cols,3));position:relative;border-right:1px solid var(--bd);background:var(--sf);align-self:flex-start;box-sizing:border-box}
+.mob-wk-dcol{flex:0 0 calc((100% - 52px)/var(--mw-cols,3));min-width:calc((100% - 52px)/var(--mw-cols,3));max-width:calc((100% - 52px)/var(--mw-cols,3));position:relative;border-right:1px solid var(--bd);background:var(--sf);align-self:flex-start;box-sizing:border-box}
 .mob-wk-grid{position:relative;background:var(--sf);min-height:100%}
 .mob-wk-grid .mgc{height:var(--mob-row-h,56px);border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s;box-sizing:border-box}
 .mob-wk-grid .mgc:active{background:var(--abg)}
@@ -418,6 +425,8 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
   .mgg-mob .mcc{padding:8px 6px}
   .mgg-mob .mcev{font-size:11px;padding:4px 7px}
   .mgg-mob .mcn{width:28px;height:28px;font-size:13px}
+  .mob-strip{display:block!important}
+  #dv{display:flex!important;flex-direction:column}
 }
 @media (max-width:900px) and (orientation:landscape){
   #sb{position:fixed;left:0;top:0;bottom:0;width:min(280px,88vw);max-width:280px;z-index:300;transform:translateX(-100%);transition:transform .22s ease;border-right:1px solid var(--bd);box-shadow:none;display:flex}
@@ -1095,7 +1104,14 @@ function syncViewUI(){
   const w=document.getElementById('wv'),m=document.getElementById('mv'),d=document.getElementById('dv');
   if(w)w.style.display=v==='week'?'flex':'none';
   if(m)m.style.display=v==='month'?'flex':'none';
-  if(d)d.style.display=v==='day'?'flex':'none';
+  if(d){
+    if(v==='day'){
+      d.style.setProperty('display','flex','important');
+      d.style.setProperty('flex-direction','column','');
+    }else{
+      d.style.setProperty('display','none','important');
+    }
+  }
 }
 function toggleSb(){
   const sb=document.getElementById('sb'),ov=document.getElementById('sb-ov'),btn=document.getElementById('btn-menu');
@@ -1659,20 +1675,26 @@ function rMobStrip(){
   const ws=wkStart(new Date(S.cur));
   const days=Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(ws.getDate()+i);return d});
   const sel=new Date(S.cur);sel.setHours(0,0,0,0);
+  const tod=new Date();tod.setHours(0,0,0,0);
   const labels=['Pt','Sa','Ca','Pe','Cu','Ct','Pz'];
   let h='';
   days.forEach((d,i)=>{
     const t0=new Date(d);t0.setHours(0,0,0,0);
     const isSel=t0.getTime()===sel.getTime();
+    const isToday=t0.getTime()===tod.getTime();
     const has=evForDate(d).length>0;
     const ds=toLocalYMD(d);
-    h+='<button type="button" class="ws-pill'+(isSel?' ws-sel':'')+'" onclick="pickStripDay(\''+ds+'\')">';
+    h+='<button type="button" class="ws-pill'+(isSel?' ws-sel':'')+(isToday?' ws-today':'')+'" onclick="pickStripDay(\''+ds+'\')">';
     h+='<span class="ws-l">'+labels[i]+'</span>';
     h+='<span class="ws-n">'+d.getDate()+'</span>';
     if(has)h+='<span class="ws-dot" aria-hidden="true"></span>';
     h+='</button>';
   });
   wrap.innerHTML=h;
+  requestAnimationFrame(()=>{
+    const pill=wrap.querySelector('.ws-today');
+    if(pill)pill.scrollIntoView({inline:'center',behavior:'smooth'});
+  });
 }
 function pickStripDay(ds){
   S.cur=new Date(ds+'T12:00:00');
