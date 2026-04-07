@@ -1079,9 +1079,6 @@ function fmt(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')
 function isMobile(){
   return (window.innerWidth<768)||(/Android|iPhone/i.test(navigator.userAgent||''));
 }
-function isAuthRedirectMobile(){
-  return /Android|iPhone|iPad/i.test(navigator.userAgent||'');
-}
 function googleCredFromRedirectResult(result){
   if(!result)return null;
   if(result.credential)return result.credential;
@@ -1687,7 +1684,8 @@ function signInGoogle(){
   const p=new firebase.auth.GoogleAuthProvider();
   p.addScope(GMAIL_SCOPE);
   const auth=firebase.auth();
-  if(isAuthRedirectMobile()){
+  const ua=navigator.userAgent||'';
+  if(/wv|WebView/i.test(ua)){
     if(msg)msg.textContent='Google’a yönlendiriliyorsunuz…';
     auth.signInWithRedirect(p).catch(err=>{
       console.error(err);
@@ -1697,7 +1695,7 @@ function signInGoogle(){
   }
   auth.signInWithPopup(p)
     .then(result=>{
-      storeGmailTokensFromCredential(result.credential);
+      if(result&&result.credential)storeGmailTokensFromCredential(result.credential);
     })
     .catch(err=>{
       console.error(err);
@@ -3736,8 +3734,11 @@ function initFirebaseAuthFlow(){
     .catch(err=>{console.error('setPersistence LOCAL',err);})
     .then(()=>auth.getRedirectResult())
     .then(result=>{
-      const cred=googleCredFromRedirectResult(result);
-      if(cred)storeGmailTokensFromCredential(cred);
+      try{
+        if(!result)return;
+        const cred=googleCredFromRedirectResult(result);
+        if(cred)storeGmailTokensFromCredential(cred);
+      }catch(e){console.warn('getRedirectResult credential',e);}
     })
     .catch(err=>{console.error('getRedirectResult',err);})
     .finally(()=>{startFirebaseAuthListener();});
@@ -3756,7 +3757,7 @@ window.addEventListener('load',()=>{
     }).catch(()=>{});
   },0);
 });
-// Gmail: OAuth access token — masaustu popup; mobil signInWithRedirect + getRedirectResult (gmail.readonly).
+// Gmail: OAuth — popup (mobil Safari dahil); yalnizca WebView icin redirect. getRedirectResult sonrasi credential yoksa da auth listener baslar.
 </script>
 </body>
 </html>
