@@ -1680,26 +1680,18 @@ function pickStripDay(ds){
   else rCal();
 }
 function signInGoogle(){
-  const msg=document.getElementById('auth-msg');if(msg)msg.textContent='';
-  const p=new firebase.auth.GoogleAuthProvider();
-  p.addScope(GMAIL_SCOPE);
-  const auth=firebase.auth();
-  const ua=navigator.userAgent||'';
-  if(/wv|WebView/i.test(ua)){
-    if(msg)msg.textContent='Google’a yönlendiriliyorsunuz…';
-    auth.signInWithRedirect(p).catch(err=>{
-      console.error(err);
-      if(msg)msg.textContent=(err&&err.message)||'Giris basarisiz';
-    });
-    return;
-  }
-  auth.signInWithPopup(p)
+  const msg=document.getElementById('auth-msg');
+  if(msg)msg.textContent='';
+  const provider=new firebase.auth.GoogleAuthProvider();
+  provider.addScope(GMAIL_SCOPE);
+  firebase.auth().signInWithPopup(provider)
     .then(result=>{
-      if(result&&result.credential)storeGmailTokensFromCredential(result.credential);
+      const cred=googleCredFromRedirectResult(result.credential);
+      if(cred)storeGmailTokensFromCredential(cred);
     })
     .catch(err=>{
       console.error(err);
-      if(msg)msg.textContent=(err&&err.message)||'Giris basarisiz';
+      if(msg)msg.textContent=(err&&err.message)||'Giriş başarısız';
     });
 }
 function signOutUser(){firebase.auth().signOut().catch(e=>console.error(e));}
@@ -3728,20 +3720,9 @@ function startFirebaseAuthListener(){
 }
 function initFirebaseAuthFlow(){
   const auth=firebase.auth();
-  const P=firebase.auth.Auth.Persistence;
-  const localPersist=(P&&P.LOCAL!==undefined)?P.LOCAL:'local';
-  return auth.setPersistence(localPersist)
-    .catch(err=>{console.error('setPersistence LOCAL',err);})
-    .then(()=>auth.getRedirectResult())
-    .then(result=>{
-      try{
-        if(!result)return;
-        const cred=googleCredFromRedirectResult(result);
-        if(cred)storeGmailTokensFromCredential(cred);
-      }catch(e){console.warn('getRedirectResult credential',e);}
-    })
-    .catch(err=>{console.error('getRedirectResult',err);})
-    .finally(()=>{startFirebaseAuthListener();});
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .catch(err=>console.error(err))
+    .finally(()=>startFirebaseAuthListener());
 }
 /* ---- BASLANGIC ---- */
 initTheme();
@@ -3757,7 +3738,7 @@ window.addEventListener('load',()=>{
     }).catch(()=>{});
   },0);
 });
-// Gmail: OAuth — popup (mobil Safari dahil); yalnizca WebView icin redirect. getRedirectResult sonrasi credential yoksa da auth listener baslar.
+// Gmail: OAuth — signInWithPopup + token; kalicilik LOCAL.
 </script>
 </body>
 </html>
