@@ -350,6 +350,13 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .nc-exam{border-left-color:#ef4444}
 .nc-hw{border-left-color:var(--ac)}
 .nc-ann{border-left-color:var(--bd2)}
+.nc-ann.ann-lbl-seminer{border-left-color:#7c3aed}
+.nc-ann.ann-lbl-kariyer{border-left-color:#059669}
+.nc-ann.ann-lbl-arastirma{border-left-color:#0891b2}
+.nc-ann.ann-lbl-etkinlik{border-left-color:#d97706}
+.nc-ann.ann-lbl-sonbasvuru{border-left-color:#dc2626}
+.nc-ann-hint{font-size:10px;color:var(--t3);align-self:center;white-space:nowrap}
+.nc-conf-warn{font-size:10px;color:#d97706;margin-bottom:4px;line-height:1.35}
 .nc.st-added{border-color:var(--ok);border-left-color:var(--ok);background:rgba(5,150,105,.06)}
 .nc.st-dismissed{opacity:.45;background:var(--s2)}
 .nc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:2px}
@@ -636,7 +643,7 @@ html[data-theme="dark"] .thm-s.act{box-shadow:0 1px 3px rgba(0,0,0,.35)}
     <button type="button" class="npt" id="mob-tab-ann" onclick="setNotifTab('announcements')">Duyurular <span id="mob-badge-ann" class="notif-badge" style="display:none">0</span></button>
   </div>
   <div class="nov-bd">
-    <button type="button" class="btn-mscan" id="btn-mscan-mob" data-btn-label="Mailleri Tara" onclick="scanMail()">Mailleri Tara</button>
+    <button type="button" class="btn-mscan" id="btn-mscan-mob" data-btn-label="Mailleri Tara (Masaüstünden tarayın, veriler senkronlanır)" onclick="scanMail()">Mailleri Tara (Masaüstünden tarayın, veriler senkronlanır)</button>
     <div id="notif-warn-mob" class="notif-warn">Sabancı mailinizi profil ayarlarından ekleyin, maillerinizi tarayalım</div>
     <div id="notif-list-mob" class="notif-list"></div>
   </div>
@@ -1243,12 +1250,35 @@ function showSaved(txt){
   el.textContent=txt||'Kaydedildi';el.style.color=cssVar('--ok','#059669');el.style.opacity='1';
   clearTimeout(_sit);_sit=setTimeout(()=>el.style.opacity='0',2000);
 }
+function sanitizeNotif(n){
+  const clean={};
+  Object.keys(n).forEach(k=>{
+    if(n[k]!==undefined)clean[k]=n[k];
+  });
+  clean.confidence=clean.confidence||'high';
+  clean.startTime=clean.startTime||'';
+  clean.endTime=clean.endTime||'';
+  clean.location=clean.location||null;
+  clean.courseCode=clean.courseCode||'';
+  clean.date=clean.date||'';
+  clean.dateDisplayTr=clean.dateDisplayTr||'';
+  clean.eventTypeLabel=clean.eventTypeLabel||'Bildirim';
+  clean.timeText=clean.timeText||'';
+  return clean;
+}
 function save(){
   const u=firebase.auth().currentUser;if(!u)return;
   clearTimeout(_fireDbSaveTimer);
   _fireDbSaveTimer=setTimeout(()=>{
+    const notifications=(S.notifications||[]).map(n=>{
+      const clean={...n};
+      Object.keys(clean).forEach(k=>{
+        if(clean[k]===undefined)delete clean[k];
+      });
+      return clean;
+    });
     firebase.firestore().collection('users').doc(u.uid).set({
-      events:S.events,layers:S.layers,customTypes:S.customTypes,notifications:S.notifications||[],
+      events:S.events,layers:S.layers,customTypes:S.customTypes,notifications,
       settings:S.settings||{},
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true}).catch(e=>console.error(e));
@@ -1475,6 +1505,10 @@ function notifCat(n){
   if(n.kind==='homework')return'homeworks';
   if(n.kind==='exam')return'exams';
   return'announcements';
+}
+function annNotifLblClass(lab){
+  const m={'Seminer':' ann-lbl-seminer','Kariyer Etkinliği':' ann-lbl-kariyer','Araştırma':' ann-lbl-arastirma','Etkinlik':' ann-lbl-etkinlik','Son Başvuru':' ann-lbl-sonbasvuru'};
+  return m[lab]||'';
 }
 function notifTitle(n){
   const c=(n.courseCode||'').trim();
@@ -2611,7 +2645,7 @@ function parseDateYMD(text){
     return ymdFromParts(y,mo-1,d);
   }
   const mm=monthMapTrEn();
-  m=t.match(new RegExp('\\b('+mm.en+')\\s+(\\d{1,2})(?:st|nd|rd|th)?,\\s*(20\\d{2})\\b','i'));
+  m=t.match(new RegExp('\\b('+mm.en+')\\s+(\\d{1,2})(?:st|nd|rd|th|rst|nth)?,\\s*(20\\d{2})\\b','i'));
   if(m){
     const mi=monthIndex(m[1]);
     if(mi!==null){
@@ -2619,7 +2653,7 @@ function parseDateYMD(text){
       return ymdFromParts(y,mi,day);
     }
   }
-  m=t.match(new RegExp('\\b('+mm.en+')\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?!\\s*,\\s*20)','i'));
+  m=t.match(new RegExp('\\b('+mm.en+')\\s+(\\d{1,2})(?:st|nd|rd|th|rst|nth)?\\b(?!\\s*,\\s*20)','i'));
   if(m){
     const mi=monthIndex(m[1]),day=parseInt(m[2],10);
     if(mi!==null){
@@ -2643,12 +2677,12 @@ function parseDateYMD(text){
       return ymdFromParts(y,mi,day);
     }
   }
-  m=t.match(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+([a-zığüşöç]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(20\d{2})\b/i);
+  m=t.match(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+([a-zığüşöç]+)\s+(\d{1,2})(?:st|nd|rd|th|rst|nth)?,?\s*(20\d{2})\b/i);
   if(m){
     const mi=monthIndex(m[1]),day=parseInt(m[2],10),y=parseInt(m[3],10);
     if(mi!==null)return ymdFromParts(y,mi,day);
   }
-  m=t.match(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+([a-zığüşöç]+)\s+(\d{1,2})(?:st|nd|rd|th)?\b(?!\s*,\s*20\d{2})/i);
+  m=t.match(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+([a-zığüşöç]+)\s+(\d{1,2})(?:st|nd|rd|th|rst|nth)?\b(?!\s*,\s*20\d{2})/i);
   if(m){
     const mi=monthIndex(m[1]),day=parseInt(m[2],10);
     if(mi!==null){
@@ -2891,6 +2925,31 @@ function collectDateCandidates(text){
   src.split(/[.!?]/).forEach(chunk=>add(parseDateYMD(chunk)));
   return out;
 }
+const examDateIgnoreContext=[
+  'results will be announced',
+  'results will be shared',
+  'grades will be posted',
+  'results announced',
+  'grades posted',
+  'objection',
+  'itiraz',
+  'solution will be',
+  'answer key will be',
+  'after the exam',
+  'was held',
+  'has been held',
+  'sınavdan sonra',
+  'notlar açıklanacak',
+  'sonuçlar açıklanacak'
+];
+function examSentenceHasIgnoreContext(sent){
+  const low=String(sent).toLowerCase();
+  return examDateIgnoreContext.some(ph=>low.includes(String(ph).toLowerCase()));
+}
+function splitMailSentences(text){
+  return String(text||'').split(/[.!?\n]+/).map(x=>x.trim()).filter(x=>x.length>1);
+}
+const examDateSentenceCue=/\b(will be held|is scheduled|takes place|exam is on|exam date|exam schedule|room allocation)\b/i;
 function parseExamDateStrict(subject,body,snippet,sentAtMs){
   const s=String(subject||''),b=String(body||''),sn=String(snippet||'');
   const all=(s+'\n'+b+'\n'+sn).replace(/\s+/g,' ');
@@ -2898,7 +2957,48 @@ function parseExamDateStrict(subject,body,snippet,sentAtMs){
     const d=new Date(sentAtMs);d.setHours(0,0,0,0);d.setDate(d.getDate()+1);
     return toLocalYMD(d);
   }
-  let ymd=null;
+  const sentences=[];
+  splitMailSentences(s).forEach(x=>sentences.push(x));
+  splitMailSentences(b).forEach(x=>sentences.push(x));
+  splitMailSentences(sn).forEach(x=>sentences.push(x));
+  const dated=[];
+  sentences.forEach(sent=>{
+    if(examSentenceHasIgnoreContext(sent))return;
+    const ymd=parseDateYMD(sent);
+    if(!ymd)return;
+    const pri=examDateSentenceCue.test(sent)?2:1;
+    dated.push({ymd,sent,pri});
+  });
+  dated.sort((a,b)=>b.pri-a.pri||(a.ymd<b.ymd?-1:a.ymd>b.ymd?1:0));
+  const today=new Date();today.setHours(0,0,0,0);
+  const pickValid=(ymd)=>{
+    if(!ymd)return null;
+    if(!examWeekdayMatches(all,ymd))return null;
+    if(isPastDateYMD(ymd)){
+      if(!sentAtMs||Date.now()-sentAtMs>7*24*60*60*1000)return null;
+    }
+    return ymd;
+  };
+  for(const row of dated){
+    const p=String(row.ymd).split('-').map(Number);
+    if(p.length===3&&new Date(p[0],p[1]-1,p[2]).getTime()>=today.getTime()){
+      const v=pickValid(row.ymd);
+      if(v)return v;
+    }
+  }
+  for(const row of dated){
+    const v=pickValid(row.ymd);
+    if(v)return v;
+  }
+  function dateHasNonIgnoredSource(ymd){
+    const blocks=[s,b,sn,...sentences];
+    for(let i=0;i<blocks.length;i++){
+      const blk=blocks[i];
+      if(!blk||examSentenceHasIgnoreContext(blk))continue;
+      if(parseDateYMD(blk)===ymd)return true;
+    }
+    return false;
+  }
   const candidates=[];
   const addCand=(d)=>{if(d&&!candidates.includes(d))candidates.push(d);};
   const ctxRe=/\b(will be held|is scheduled|takes place|exam date|exam schedule|room allocation|on)\b/ig;
@@ -2911,16 +3011,30 @@ function parseExamDateStrict(subject,body,snippet,sentAtMs){
   collectDateCandidates(s).forEach(addCand);
   collectDateCandidates(b).forEach(addCand);
   if(!candidates.length)addCand(parseDateYMD(s)||parseDateYMD(b));
-  const today=new Date();today.setHours(0,0,0,0);
   const future=candidates.filter(d=>{
+    if(!d)return false;
+    if(!dateHasNonIgnoredSource(d))return false;
     const p=String(d).split('-').map(Number);
     if(p.length!==3)return false;
     return new Date(p[0],p[1]-1,p[2]).getTime()>=today.getTime();
   }).sort();
-  ymd=future[0]||candidates[0]||null;
-  if(ymd&&!examWeekdayMatches(all,ymd))return null;
-  if(ymd&&isPastDateYMD(ymd))return null;
-  return ymd||null;
+  for(let i=0;i<future.length;i++){
+    const v=pickValid(future[i]);
+    if(v)return v;
+  }
+  const rest=candidates.filter(d=>d&&dateHasNonIgnoredSource(d));
+  for(let i=0;i<rest.length;i++){
+    const v=pickValid(rest[i]);
+    if(v)return v;
+  }
+  if(/\bduring (?:the )?regular class hours\b/i.test(b)){
+    const d=parseDateYMD(all)||parseDateYMD(b)||parseDateYMD(s)||parseDateYMD(sn);
+    if(d){
+      const v=pickValid(d);
+      if(v)return v;
+    }
+  }
+  return null;
 }
 function isSuCourseHomeworkSource(fromHeader){
   const f=String(fromHeader||'').toLowerCase();
@@ -3101,6 +3215,22 @@ function parseExamTimes(text){
   }
   return{start:'',end:'',deadlineOnly:false,timeText:''};
 }
+function calcExamConfidence(subject,body){
+  let score=0;
+  const s=String(subject||'').toLowerCase();
+  const b=String(body||'').toLowerCase();
+  const all=s+'\n'+b;
+  if(/\b(midterm|final exam|vize|sinav|sınav|room allocation|exam schedule|exam date)\b/i.test(s))score+=3;
+  else if(/\bexam\b/i.test(s))score+=2;
+  if(/\b(will be held|is scheduled|takes place|exam room|sınav yeri|sınav tarihi)\b/i.test(b))score+=2;
+  if(parseDateYMD(all))score+=1;
+  if(/\d{1,2}:\d{2}/.test(all))score+=1;
+  if(/\b(FENS|FASS|SCI|SPS|SUNUM)\s*[A-Z]?\s*\d{3,4}\b/i.test(all))score+=1;
+  if(/\b(exam results|grades announced|grades published|answer key|graded|grading complete|notlar açıklandı)\b/i.test(all))score-=3;
+  if(/\b(objection|itiraz|grade appeal|see your paper|check your paper|sınav kağıdı|inspect)\b/i.test(all))score-=2;
+  if(/\b(was held|has been held|took place|after the exam|sınavdan sonra)\b/i.test(all))score-=1;
+  return score;
+}
 function classifyMailKind(subject,body){
   const s=String(subject||'');
   const t=String(body||'');
@@ -3114,15 +3244,27 @@ function classifyMailKind(subject,body){
   const subjExamCue=hasExamSubjectContext(s);
   const bodyExamCue=hasExamBodyContext(t);
   if(!course&&!hasExamLex)return null;
-  // Balanced rule: subject cue is enough; body cue needs course/exam lexeme.
-  if(subjExamCue)return{kind:'exam',label:parseExamLabel(subject,body)};
-  if(bodyExamCue&&(course||hasExamLex))return{kind:'exam',label:parseExamLabel(subject,body)};
-  if(/\bfurther information will be shared\b/i.test(c))return null;
+  const examEligible=subjExamCue||(bodyExamCue&&(course||hasExamLex));
+  if(examEligible){
+    const sc=calcExamConfidence(s,t);
+    if(sc>=2){
+      return{kind:'exam',label:parseExamLabel(subject,body),confidence:sc>=4?'high':'medium'};
+    }
+  }
   const hw=hasHomeworkSubjectCue(s)||hasHomeworkBodyCue(c)||/\bis due\b|\bdue soon\b|\bdue on\b|\bassignment is new\b|\bfollowing assignments\b/i.test(c);
   const oh=/\boffice hours?\b/i.test(c)&&/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|pazar|pazartesi|sali|carsamba|persembe|cuma|cumartesi)\b/i.test(c)&&/\d{1,2}[.:]\d{2}/.test(c);
   if(hw)return{kind:'homework',label:parseHomeworkLabel(subject,body)};
   if(oh)return{kind:'office',label:'Office Hour'};
   return null;
+}
+function announcementTypeLabelFromText(low){
+  if(/\b(?:career fair|info session|company visit|recruitment|hiring event)\b/i.test(low))return'Kariyer Etkinliği';
+  if(/\b(?:scholarship|burs|erasmus|exchange|application deadline|basvuru|son tarih)\b/i.test(low))return'Son Başvuru';
+  if(/\b(?:pure|research talk|poster session|thesis defense)\b/i.test(low))return'Araştırma';
+  if(/\b(?:fest|festival|social event|ceremony|orientation)\b/i.test(low))return'Etkinlik';
+  if(/\b(?:seminar|workshop|webinar|invited talk|guest speaker|lecture|talk)\b/i.test(low))return'Seminer';
+  if(/\b(?:etkinlik|event|duyuru|announcement|konferans|panel|sempozyum|konusma|sunum)\b/i.test(low))return'Duyuru';
+  return'Duyuru';
 }
 function parseUniversityMail(subject,snippet,bodyText,fromEmail,sentAtMs,dbg){
   const markSkip=(reason)=>{
@@ -3141,7 +3283,7 @@ function parseUniversityMail(subject,snippet,bodyText,fromEmail,sentAtMs,dbg){
   const em=extractSabanciFrom(fromEmail);
   if(!em||!isAllowedGmailFrom(em))return markSkip('Gonderen sabanci kaynagi degil');
   const lowFlat=flat.toLowerCase();
-  const annRe=/\b(erasmus|pure|burs|scholarship|etkinlik|event|duyuru|announcement)s?\b/i;
+  const annRe=/\b(?:seminar|workshop|webinar|talk|lecture|invited talk|guest speaker|career fair|info session|company visit|recruitment|hiring event|pure|research talk|poster session|thesis defense|fest|festival|social event|ceremony|orientation|scholarship|burs|erasmus|exchange|application deadline|etkinlik|event|duyuru|announcement|konferans|panel|sempozyum|konusma|sunum|basvuru|son tarih)\b/i;
   let course=extractCourseCode(sub,body,sn);
   // First classify once, then run strictly separated pipelines.
   let kindObj=classifyMailKind(sub,combined);
@@ -3152,16 +3294,24 @@ function parseUniversityMail(subject,snippet,bodyText,fromEmail,sentAtMs,dbg){
   if(!course){
     if(!kindObj){
       if(!annRe.test(lowFlat))return markSkip('Ders kodu yok ve tur siniflandirilamadi');
-      const dateYMDAnn=parseDateYMD(combined);
+      const dateYMD=parseDateYMD(combined)||'';
+      const t=parseMailTimes(combined,'exam');
+      const hasTimeHint=/\d{1,2}\s*[:.]\s*\d{2}|\d{1,2}:\d{2}\s*(?:AM|PM)/i.test(flat);
+      const start=hasTimeHint?(t.start||''):'';
+      const end=hasTimeHint?(t.end||''):'';
+      const locInfo=parseLocationInfo(combined);
+      const eventTypeLabel=announcementTypeLabelFromText(lowFlat);
       return{
         kind:'announcement',
-        eventTypeLabel:'Duyuru',
+        eventTypeLabel,
         courseCode:'',
-        date:dateYMDAnn||'',
-        dateDisplayTr:dateYMDAnn?formatNotificationDate(dateYMDAnn):'',
-        startTime:'',
-        endTime:'',
-        location:null
+        date:dateYMD,
+        dateDisplayTr:dateYMD?formatNotificationDate(dateYMD):'',
+        startTime:start,
+        endTime:end,
+        location:locInfo.location||null,
+        hasDate:!!dateYMD,
+        hasTime:!!(start&&end)
       };
     }
     // Keep classified exam/homework even when course code is missing.
@@ -3190,7 +3340,7 @@ function parseUniversityMail(subject,snippet,bodyText,fromEmail,sentAtMs,dbg){
   const roomNoteRequired=(kindObj.kind==='exam'&&locInfo.hasMultipleLocations);
   let location=locInfo.location;
   if(kindObj.kind==='homework')location='SUCourse üzerinden teslim';
-  return{
+  const out={
     kind:kindObj.kind,
     eventTypeLabel:kindObj.label,
     courseCode:course,
@@ -3202,6 +3352,38 @@ function parseUniversityMail(subject,snippet,bodyText,fromEmail,sentAtMs,dbg){
     location:location,
     roomNoteRequired
   };
+  if(kindObj.kind==='exam')out.confidence=kindObj.confidence||'high';
+  return out;
+}
+function parseUniversityMailMulti(subject,snippet,bodyText,fromEmail,sentAtMs,dbg){
+  const body=String(bodyText||'');
+  const lines=body.split('\n').map(l=>l.trim()).filter(Boolean);
+  const results=[];
+  lines.forEach(line=>{
+    const courseMatch=line.match(/\b([A-Z]{2,4})\s*(\d{3})\b/);
+    const dateMatch=parseDateYMD(line);
+    const timeMatch=parseExamTimes(line);
+    if(courseMatch&&dateMatch&&timeMatch.start){
+      const courseCode=courseMatch[1]+courseMatch[2];
+      const locInfo=parseExamLocationByProfile(line);
+      results.push({
+        kind:'exam',
+        eventTypeLabel:parseExamLabel(subject,line),
+        courseCode,
+        date:dateMatch,
+        dateDisplayTr:formatNotificationDate(dateMatch),
+        startTime:timeMatch.start,
+        endTime:timeMatch.end,
+        timeText:timeMatch.timeText||'',
+        location:locInfo.location,
+        roomNoteRequired:!!locInfo.hasMultipleLocations,
+        confidence:'high'
+      });
+    }
+  });
+  if(results.length>1)return results;
+  const single=parseUniversityMail(subject,snippet,bodyText,fromEmail,sentAtMs,dbg);
+  return single?[single]:[];
 }
 function notifDedupeKey(o){
   const lbl=(o.eventTypeLabel||'');
@@ -3433,7 +3615,7 @@ async function gmailApiGet(token,path){
 
 async function fetchMailsWithToken(accessToken,sab){
   if(!accessToken)return[];
-  const qBase='newer_than:30d (from:sabanciuniv.edu OR from:sucourse.sabanciuniv.edu)';
+  const qBase='newer_than:60d (from:sabanciuniv.edu OR from:sucourse.sabanciuniv.edu)';
   const q=qBase;
   let pageToken='',seenMsg=new Set((S.notifications||[]).map(n=>n.gmailMessageId).filter(Boolean));
   const rows=[];
@@ -3464,20 +3646,22 @@ async function fetchMailsWithToken(accessToken,sab){
         skipped:true,
         skipReason:'Parse edilmedi'
       };
-      const parsed=parseUniversityMail(subj,snip,plain,fromH,internalMs,dbg);
-      if(parsed){
+      const parsedList=parseUniversityMailMulti(subj,snip,plain,fromH,internalMs,dbg);
+      if(parsedList.length){
         dbg.skipped=false;
         dbg.skipReason='';
       }
       if(window.debugMails&&Array.isArray(window.debugMails))window.debugMails.push(dbg);
-      if(!parsed)continue;
-      rows.push({
-        parsed,
-        gmailMessageId:msg.id,
-        gmailInternalDate:internalMs,
-        snippet:snip.slice(0,280),
-        title:subj||'(Konu yok)'
-      });
+      if(!parsedList.length)continue;
+      for(let pi=0;pi<parsedList.length;pi++){
+        rows.push({
+          parsed:sanitizeNotif(parsedList[pi]),
+          gmailMessageId:msg.id,
+          gmailInternalDate:internalMs,
+          snippet:snip.slice(0,280),
+          title:subj||'(Konu yok)'
+        });
+      }
       seenMsg.add(msg.id);
     }
     pageToken=list.nextPageToken||'';
@@ -3546,6 +3730,9 @@ async function scanMail(){
         startTime:p.startTime,
         endTime:p.endTime,
         location:p.location,
+        hasDate:!!(p.hasDate!==undefined?p.hasDate:p.date),
+        hasTime:!!(p.hasTime!==undefined?p.hasTime:(p.startTime&&p.endTime)),
+        confidence:p.kind==='exam'?(p.confidence||'high'):undefined,
         snippet:row.snippet,
         title:row.title
       });
@@ -3587,7 +3774,11 @@ function markNotifsRead(){
 }
 
 function notifUnreadCount(){
-  return(S.notifications||[]).filter(n=>n.status==='pending'&&!n.read&&n.kind!=='announcement').length;
+  return(S.notifications||[]).filter(n=>{
+    if(n.status!=='pending'||n.read)return false;
+    if(n.kind==='announcement')return!!n.date;
+    return true;
+  }).length;
 }
 
 function rNotifications(){
@@ -3643,14 +3834,30 @@ function rNotifications(){
       g.items.sort((a,b)=>(b.gmailInternalDate||0)-(a.gmailInternalDate||0));
       g.items.forEach(n=>{
         const st=n.status==='added'?' st-added':n.status==='dismissed'?' st-dismissed':'';
-        const kc=n.kind==='exam'?' nc-exam':n.kind==='homework'?' nc-hw':(n.kind==='announcement'?' nc-ann':'');
+        if(n.kind==='announcement'){
+          const kc=' nc-ann'+annNotifLblClass(n.eventTypeLabel||'');
+          const canAdd=n.status==='pending'&&n.date&&!(n.kind==='announcement'&&!n.date);
+          h+='<div class="nc'+st+kc+'" data-nid="'+escHtml(n.id)+'">';
+          h+='<div class="nc-top"><span class="nc-title">'+escHtml(n.title||notifTitle(n))+'</span></div>';
+          if(n.dateDisplayTr||n.date)h+='<div class="nc-meta">📅 '+escHtml(n.dateDisplayTr||n.date)+'</div>';
+          if(n.startTime)h+='<div class="nc-meta">🕐 '+escHtml(n.endTime?((n.startTime||'')+' – '+(n.endTime||'')):n.startTime)+'</div>';
+          if(n.location)h+='<div class="nc-loc">📍 '+escHtml(n.location)+'</div>';
+          h+='<div class="nc-act">';
+          h+='<button type="button" class="nc-add btn-ekle" data-id="'+escHtml(n.id)+'" '+(canAdd?'':'disabled')+'>Takvime Ekle</button>';
+          if(!n.date)h+='<span class="nc-ann-hint">Bilgi amaçlı</span>';
+          h+='<button type="button" class="nc-dismiss btn-reddet" data-id="'+escHtml(n.id)+'" '+(n.status==='pending'?'':'disabled')+'>Reddet</button>';
+          h+='</div></div>';
+          return;
+        }
+        const kc=n.kind==='exam'?' nc-exam':n.kind==='homework'?' nc-hw':'';
         const timeParts=[];
         if(n.dateDisplayTr)timeParts.push(n.dateDisplayTr);
         else if(n.date)timeParts.push(n.date);
         if(n.timeText)timeParts.push(n.timeText);
         else if(n.startTime||n.endTime)timeParts.push((n.startTime||'')+' – '+(n.endTime||''));
-        const canAdd=n.status==='pending'&&n.date&&n.kind!=='announcement';
+        const canAdd=n.status==='pending'&&n.date&&!(n.kind==='announcement'&&!n.date);
         h+='<div class="nc'+st+kc+'" data-nid="'+escHtml(n.id)+'">';
+        if(n.kind==='exam'&&n.confidence==='medium')h+='<div class="nc-conf-warn">⚠️ Bu bildirim otomatik oluşturuldu, tarihi kontrol edin</div>';
         h+='<div class="nc-top"><span class="nc-title">'+escHtml(notifTitle(n))+'</span></div>';
         if(timeParts.length)h+='<div class="nc-meta">📅 '+escHtml(timeParts.join(' · '))+'</div>';
         if(n.location)h+='<div class="nc-loc">📍 '+escHtml(n.location)+'</div>';
@@ -3660,21 +3867,6 @@ function rNotifications(){
         h+='</div></div>';
       });
     });
-    if(whichTab==='announcements'&&anns.length){
-      h+='<div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin:8px 2px 4px;">Duyurular</div>';
-      anns.forEach(n=>{
-        const st=n.status==='dismissed'?' st-dismissed':'';
-        const titleLine=(n.eventTypeLabel||'Duyuru');
-        const dateTxt=(n.dateDisplayTr||n.date||'');
-        h+='<div class="nc'+st+' nc-ann" data-nid="'+escHtml(n.id)+'">';
-        h+='<div class="nc-top"><span class="nc-title">'+escHtml(titleLine)+'</span></div>';
-        if(dateTxt)h+='<div class="nc-meta">📅 '+escHtml(dateTxt)+'</div>';
-        h+='<div class="nc-act">';
-        h+='<button type="button" class="nc-add" disabled>Takvime Ekle</button>';
-        h+='<button type="button" class="nc-dismiss btn-reddet" data-id="'+escHtml(n.id)+'" '+(n.status==='pending'?'':'disabled')+'>Reddet</button>';
-        h+='</div></div>';
-      });
-    }
     return h;
   };
   const html=render(tab);
@@ -3684,7 +3876,7 @@ function rNotifications(){
   // tab badges (desktop)
   const cEx=arr.filter(n=>n.kind==='exam'&&n.status==='pending'&&!n.read&&n.date&&((n.startTime&&n.endTime)||n.timeText)).length;
   const cHw=arr.filter(n=>n.kind==='homework'&&n.status==='pending'&&!n.read&&n.date).length;
-  const cAn=arr.filter(n=>notifCat(n)==='announcements'&&n.status==='pending'&&!n.read).length;
+  const cAn=arr.filter(n=>notifCat(n)==='announcements'&&n.status==='pending'&&!n.read&&n.date).length;
   const badgeIds=[
     ['badge-exams',cEx],['badge-hw',cHw],['badge-ann',cAn],
     ['mob-badge-exams',cEx],['mob-badge-hw',cHw],['mob-badge-ann',cAn]
@@ -3712,20 +3904,26 @@ function notifAddCal(id){
   if(!n||n.status!=='pending')return;
   if(!n.date){alert('Tarih bulunamadi; takvime eklenemedi.');return;}
   const typeId=(n.kind==='homework')?'homework':'exam';
-  const layer=findLayerForType(typeId)||findLayerForType('exam');
+  const layer=n.kind==='announcement'
+    ?(findLayerForType('exam')||S.layers[0])
+    :(findLayerForType(typeId)||findLayerForType('exam'));
   const layerId=layer?layer.id:(S.layers[0]?S.layers[0].id:'l1');
   const tc=typeById(typeId);
-  const title=notifTitle(n);
+  const title=n.kind==='announcement'?(n.title||notifTitle(n)):notifTitle(n);
   const roomNote=n.roomNoteRequired
     ?'Sinav odaniz ogrenci numaraniza gore belirlenmistir. Duyuruyu kontrol ediniz.'
     :'';
   const note=[n.location?('Konum: '+n.location):'',roomNote].filter(Boolean).join(' — ');
+  const st=n.startTime||'09:00';
+  const en=n.kind==='announcement'
+    ?(n.endTime||(n.startTime?addMinutesToTime(n.startTime,90):'10:30'))
+    :(n.endTime||'10:30');
   const ev={
     id:uid(),title,typeId,
     course:(n.courseCode||'').trim(),
     note,
-    startTime:n.startTime||'09:00',
-    endTime:n.endTime||'10:30',
+    startTime:st,
+    endTime:en,
     recur:[],
     date:n.date,
     color:tc.color,
