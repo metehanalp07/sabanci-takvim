@@ -2640,6 +2640,24 @@ function parseDateYMD(text){
   const t=String(text);
   let m=t.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
   if(m)return m[0];
+  // Date range: "April 6-17, 2026" -> take start day
+  m=t.match(/\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[a-z]*\s+(\d{1,2})\s*[-–]\s*\d{1,2},?\s*(20\d{2})\b/i);
+  if(m){
+    const mi=monthIndex(m[1]);
+    if(mi!==null){
+      const day=parseInt(m[2],10),y=parseInt(m[3],10);
+      return ymdFromParts(y,mi,day);
+    }
+  }
+  // Turkish date range: "6-17 Nisan 2026" -> take start day
+  m=t.match(/\b(\d{1,2})\s*[-–]\s*\d{1,2}\s+(ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık)\s+(20\d{2})\b/i);
+  if(m){
+    const mi=monthIndex(m[2]);
+    if(mi!==null){
+      const day=parseInt(m[1],10),y=parseInt(m[3],10);
+      return ymdFromParts(y,mi,day);
+    }
+  }
   m=t.match(/\b(\d{1,2})[./](\d{1,2})[./](20\d{2}|\d{2})\b/);
   if(m){
     let d=parseInt(m[1],10),mo=parseInt(m[2],10),y=parseInt(m[3],10);
@@ -2976,9 +2994,7 @@ function parseExamDateStrict(subject,body,snippet,sentAtMs){
   const pickValid=(ymd)=>{
     if(!ymd)return null;
     if(!examWeekdayMatches(all,ymd))return null;
-    if(isPastDateYMD(ymd)){
-      if(!sentAtMs||Date.now()-sentAtMs>7*24*60*60*1000)return null;
-    }
+    if(isBeforeSentDate(ymd,sentAtMs))return null;
     return ymd;
   };
   for(const row of dated){
@@ -3029,7 +3045,7 @@ function parseExamDateStrict(subject,body,snippet,sentAtMs){
     const v=pickValid(rest[i]);
     if(v)return v;
   }
-  if(/\bduring (?:the )?regular class hours\b/i.test(b)){
+  if(/\bduring (?:the )?(?:regular )?class hours\b/i.test(b)){
     const d=parseDateYMD(all)||parseDateYMD(b)||parseDateYMD(s)||parseDateYMD(sn);
     if(d){
       const v=pickValid(d);
@@ -3093,7 +3109,21 @@ function isPastDateYMD(ymd){
   const now=new Date();now.setHours(0,0,0,0);
   return d<now.getTime();
 }
-function parseHomeworkDeadlineStrict(subject,body,snippet){
+function isBeforeSentDate(ymd,sentAtMs){
+  if(!ymd)return true;
+  if(!sentAtMs)return isPastDateYMD(ymd);
+  const p=ymd.split('-').map(Number);
+  if(p.length!==3)return true;
+  const evDate=new Date(p[0],p[1]-1,p[2],0,0,0,0).getTime();
+  const sent=new Date(sentAtMs);sent.setHours(0,0,0,0);
+  return evDate<sent.getTime();
+}
+function isSameDayAsSent(ymd,sentAtMs){
+  if(!ymd||!sentAtMs)return false;
+  const sentYmd=toLocalYMD(new Date(sentAtMs));
+  return ymd===sentYmd;
+}
+function parseHomeworkDeadlineStrict(subject,body,snippet,sentAtMs){
   const s=String(subject||''),b=String(body||''),sn=String(snippet||'');
   const all=(s+'\n'+b+'\n'+sn).replace(/\u2013/g,'-');
   if(shouldSkipHomeworkMail(all))return null;
@@ -3103,7 +3133,7 @@ function parseHomeworkDeadlineStrict(subject,body,snippet){
   })();
   const dateYMD=parseDateYMD(focus)||parseDateYMD(all);
   if(!dateYMD)return null;
-  if(isPastDateYMD(dateYMD))return null;
+  if(isBeforeSentDate(dateYMD,sentAtMs))return null;
   let end='';
   let m=all.match(/\b(?:deadline is|due on|due:|closes:)\b[^.\n]{0,120}?(\d{1,2}):(\d{2})\s*(AM|PM)\b/i);
   if(m)end=to24hm(m[1],m[2],m[3])||'';
@@ -3147,6 +3177,8 @@ function pickParsedDate(subject,body,snippet,sentAtMs){
   if(!ymd)ymd=parseDateYMD(s);
   // Fallback: snippet only if explicit body/subject missed
   if(!ymd)ymd=parseDateYMD(sn);
+  if(!ymd)return null;
+  if(ymd&&isSameDayAsSent(ymd,sentAtMs))ymd=null;
   if(!ymd)return null;
   if(!isAtLeastOneDayAfterSent(ymd,sentAtMs))return null;
   return ymd;
@@ -3328,7 +3360,7 @@ function parseUniversityMail(subject,snippet,bodyText,fromEmail,sentAtMs,dbg){
     const t=parseExamTimes(combined);
     start=t.start;end=t.end;timeText=t.timeText||'';
   }else if(kindObj.kind==='homework'){
-    const hw=parseHomeworkDeadlineStrict(sub,body,sn);
+    const hw=parseHomeworkDeadlineStrict(sub,body,sn,sentAtMs);
     if(!hw)return markSkip('Odev deadline parse edilemedi');
     dateYMD=hw.date;start=hw.startTime;end=hw.endTime;timeText=hw.timeText||'';
   }else{
